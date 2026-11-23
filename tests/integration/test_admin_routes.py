@@ -1,6 +1,7 @@
 from collections.abc import Iterator
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, date, datetime, timedelta
 from email.message import EmailMessage
+from unittest.mock import MagicMock
 
 import pytest
 from fastapi.testclient import TestClient
@@ -11,8 +12,11 @@ from app.api import admin
 from app.config import Settings, get_settings
 from app.db import get_session
 from app.main import create_app
-from app.models import Alert, AlertMatch
+from app.models import Alert, AlertMatch, CollectionStatus, CollectionTrigger
+from app.repositories import collection_runs
 from app.security import COOKIE_NAME
+from app.services.locks import collection_lock
+from app.services.pipeline import PipelineResult
 from tests.integration.factories import make_alert, make_tender
 
 PASSWORD = "senha-do-admin"
@@ -111,11 +115,20 @@ def test_login_nao_redireciona_para_fora_do_admin(anonymous: TestClient, target:
     assert response.headers["location"] == "/admin/alertas"
 
 
-def test_cookie_em_producao_e_secure(db_session: Session) -> None:
-    with _client(db_session, _settings(app_env="production")) as client:
-        response = client.post("/admin/login", data={"password": PASSWORD})
+@pytest.mark.parametrize(
+    ("base_url", "secure"),
+    [("https://radar.exemplo.com.br", True), ("http://192.168.0.10:8000", False)],
+)
+def test_cookie_secure_quando_o_endereco_e_https(
+    db_session: Session, base_url: str, secure: bool
+) -> None:
+    settings = _settings(app_env="production", app_base_url=base_url)
+    with _client(db_session, settings) as client:
+        response = client.post(
+            "/admin/login", data={"password": PASSWORD}, headers={"Origin": base_url}
+        )
 
-    assert "Secure" in response.headers["set-cookie"]
+    assert ("Secure" in response.headers["set-cookie"]) is secure
 
 
 def test_post_de_outro_site_e_bloqueado(logged: TestClient, db_session: Session) -> None:
@@ -246,3 +259,59 @@ def test_enviar_resumos_agora(
 
 def test_lista_avisa_quando_smtp_nao_esta_configurado(logged: TestClient) -> None:
     assert "SMTP não configurado" in logged.get("/admin/alertas").text
+
+
+# --- Coletas ---------------------------------------------------------------------------
+
+
+def test_tela_de_coletas(logged: TestClient, db_session: Session) -> None:
+    run = collection_runs.start_run(
+        db_session,
+        trigger=CollectionTrigger.SCHEDULED,
+        date_from=date(2026, 11, 21),
+        date_to=date(2026, 11, 22),
+        states=["MT"],
+    )
+    collection_runs.finish_run(run, CollectionStatus.FAILED, "PNCP respondeu 500")
+    db_session.commit()
+
+    html = logged.get("/admin/coletas").text
+
+    assert "Falhou" in html and "PNCP respondeu 500" in html
+    assert "21/11/2026 a 22/11/2026" in html
+    assert "Coleta automática às 7h e 18h (America/Cuiaba)" in html
+    assert "Próxima:" in html
+
+
+def test_coletar_agora_roda_em_segundo_plano(
+    logged: TestClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    calls: list[dict[str, object]] = []
+
+    def fake_pipeline(settings: object, sessions: object, **kwargs: object) -> PipelineResult:
+        calls.append(kwargs)
+        return PipelineResult()
+
+    monkeypatch.setattr(admin, "run_pipeline", fake_pipeline)
+
+    response = logged.post("/admin/coletas/agora")
+
+    assert response.headers["location"] == "/admin/coletas?msg=collect_started"
+    assert calls == [{"trigger": CollectionTrigger.MANUAL, "send_notifications": False}]
+    assert "Coleta iniciada" in logged.get(response.headers["location"]).text
+
+
+def test_coletar_agora_com_coleta_em_andamento(
+    logged: TestClient, db_session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    run_pipeline = MagicMock()
+    monkeypatch.setattr(admin, "run_pipeline", run_pipeline)
+
+    with collection_lock(db_session.get_bind()):
+        response = logged.post("/admin/coletas/agora")
+        page = logged.get("/admin/coletas").text
+
+    assert response.headers["location"] == "/admin/coletas?msg=collect_busy"
+    run_pipeline.assert_not_called()
+    assert "Há uma coleta em andamento" in page
+    assert "disabled" in page

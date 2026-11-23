@@ -1,0 +1,84 @@
+# Produção: banco + migrations + app web + agendador (coleta às 7h e 18h).
+#
+#   docker compose -f docker-compose.prod.yml up -d --build
+#
+# Tudo vem do .env (veja .env.example). O banco não é exposto para fora do Docker.
+# Coloque a app atrás de um proxy com HTTPS (Caddy, nginx, Cloudflare Tunnel...) e use
+# APP_BASE_URL=https://... para o cookie do admin ser "Secure".
+
+x-app: &app
+  build: .
+  image: radar-licitacoes:latest
+  env_file: .env
+  environment:
+    APP_ENV: production
+    DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
+  restart: unless-stopped
+  logging:
+    driver: json-file
+    options:
+      max-size: "10m"
+      max-file: "5"
+
+services:
+  db:
+    image: postgres:17
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD}
+      POSTGRES_DB: ${POSTGRES_DB}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+
+  # Aplica as migrations e termina; app e agendador só sobem depois que ela der certo.
+  migrate:
+    <<: *app
+    command: ["alembic", "upgrade", "head"]
+    restart: "no"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  app:
+    <<: *app
+    command:
+      - uvicorn
+      - app.main:app
+      - --host=0.0.0.0
+      - --port=8000
+      - --proxy-headers
+      - --forwarded-allow-ips=*
+    ports:
+      - "${APP_PORT:-8000}:8000"
+    healthcheck:
+      test:
+        - CMD
+        - python
+        - -c
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/health', timeout=4)"
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+  # Um único agendador (não escale este serviço). A trava no banco impede coletas
+  # simultâneas mesmo assim, inclusive com o botão "Coletar agora".
+  scheduler:
+    <<: *app
+    command: ["python", "-m", "app.scheduler"]
+    stop_grace_period: 30s
+    depends_on:
+      migrate:
+        condition: service_completed_successfully
+
+volumes:
+  pgdata:

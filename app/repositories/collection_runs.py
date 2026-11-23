@@ -3,6 +3,7 @@
 from collections.abc import Sequence
 from datetime import UTC, date, datetime
 
+from sqlalchemy import func, select, update
 from sqlalchemy.orm import Session
 
 from app.models import CollectionRun, CollectionStatus, CollectionTrigger
@@ -43,3 +44,25 @@ def finish_run(
     run.status = status
     run.error_message = error_message
     run.finished_at = datetime.now(UTC)
+
+
+def recent_runs(session: Session, limit: int = 20) -> list[CollectionRun]:
+    stmt = select(CollectionRun).order_by(CollectionRun.started_at.desc()).limit(limit)
+    return list(session.scalars(stmt))
+
+
+def fail_interrupted_runs(session: Session) -> int:
+    """Marca como falhas as coletas que ficaram "em andamento" (processo interrompido).
+
+    Só pode ser chamado com a trava de coleta em mãos: aí nenhuma outra está rodando.
+    """
+    result = session.execute(
+        update(CollectionRun)
+        .where(CollectionRun.status == CollectionStatus.RUNNING)
+        .values(
+            status=CollectionStatus.FAILED,
+            finished_at=func.now(),
+            error_message="Coleta interrompida antes de terminar (processo encerrado).",
+        )
+    )
+    return result.rowcount or 0

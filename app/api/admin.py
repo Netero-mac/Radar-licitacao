@@ -1,32 +1,37 @@
-"""Área administrativa: login e cadastro de alertas (telas HTML com formulários comuns).
+"""Área administrativa: login, alertas e coletas (telas HTML com formulários comuns).
 
 Proteções:
 - senha única ADMIN_PASSWORD, comparada em tempo constante, com atraso após erro;
-- cookie de sessão assinado (app/security.py), HttpOnly, SameSite=Lax e Secure em produção;
+- cookie de sessão assinado (app/security.py), HttpOnly, SameSite=Lax e Secure com HTTPS;
 - todo POST confere a origem da requisição (Origin/Referer), contra CSRF.
 """
 
 import logging
 import time
+from datetime import UTC, datetime
 from typing import Annotated, Any
 from urllib.parse import urlencode, urlsplit
 
-from fastapi import APIRouter, Depends, Form, Request, status
+from fastapi import APIRouter, BackgroundTasks, Depends, Form, Request, status
 from fastapi.responses import HTMLResponse, RedirectResponse, Response
 from sqlalchemy.orm import Session
 
 from app.api.templating import display_timezone, get_templates
 from app.config import Settings, get_settings
-from app.db import get_session
+from app.db import get_session, get_sessionmaker
 from app.geo import STATES, municipality_label, state_name
-from app.models import Alert
+from app.models import Alert, CollectionTrigger
 from app.notifiers.email import SmtpEmailSender
 from app.notifiers.telegram import TelegramClient
+from app.repositories import collection_runs
+from app.scheduler import next_scheduled_runs
 from app.schemas.alerts import AlertForm
 from app.security import COOKIE_NAME, check_password, issue_token, verify_token
 from app.services import alerts as service
 from app.services.alerts import IneffectiveKeywordError
+from app.services.locks import collection_running
 from app.services.notifications import DigestContext, send_digests
+from app.services.pipeline import run_pipeline
 
 logger = logging.getLogger(__name__)
 router = APIRouter(prefix="/admin", include_in_schema=False)
@@ -45,6 +50,9 @@ FLASH_MESSAGES = {
     "{tenders} licitação(ões).",
     "digest_failed": "Alguns resumos falharam ({failures}); veja os logs. Enviados: "
     "{emails} e-mail(s), {telegram} mensagem(ns) no Telegram.",
+    "collect_started": "Coleta iniciada. Ela roda em segundo plano: atualize esta página "
+    "para acompanhar.",
+    "collect_busy": "Já existe uma coleta em andamento. Aguarde ela terminar.",
 }
 
 
@@ -149,7 +157,9 @@ def login(
         path="/admin",
         httponly=True,
         samesite="lax",
-        secure=settings.app_env == "production",
+        # Secure quando o endereço público é HTTPS: com http:// o navegador descartaria o
+        # cookie e o login falharia sem explicação.
+        secure=settings.app_base_url.startswith("https://"),
     )
     return response
 
@@ -395,3 +405,51 @@ def send_digests_now(session: SessionDep, settings: SettingsDep) -> Response:
         tenders=report.tenders_notified,
         failures=len(report.failures),
     )
+
+
+# --- Coletas ---------------------------------------------------------------------------
+
+
+def manual_collection(settings: Settings) -> None:
+    """Coleta + cruzamento com os alertas, em segundo plano (os resumos ficam no horário)."""
+    try:
+        result = run_pipeline(
+            settings,
+            get_sessionmaker(),
+            trigger=CollectionTrigger.MANUAL,
+            send_notifications=False,
+        )
+    except Exception:
+        logger.exception("Falha na coleta manual")
+        return
+    if result.skipped:
+        logger.warning("Coleta manual ignorada: outra coleta está em andamento")
+
+
+@router.get(
+    "/coletas", response_class=HTMLResponse, name="admin_collections", dependencies=[AdminDep]
+)
+def collections_page(request: Request, session: SessionDep, settings: SettingsDep) -> Response:
+    now = datetime.now(UTC)
+    context = {
+        "runs": collection_runs.recent_runs(session),
+        "running": collection_running(session.get_bind()),
+        "next_runs": next_scheduled_runs(settings, now),
+        "schedule_hours": settings.schedule_hours,
+        "schedule_tz": settings.schedule_timezone,
+        "flash": _flash(request),
+        "flash_error": request.query_params.get("msg") == "collect_busy",
+        "now": now,
+    }
+    return get_templates().TemplateResponse(request, "admin/collections.html", context)
+
+
+@router.post("/coletas/agora", dependencies=[AdminDep, SameOriginDep])
+def collect_now(
+    session: SessionDep, settings: SettingsDep, background: BackgroundTasks
+) -> Response:
+    """Dispara a coleta em segundo plano. A trava no banco impede duas ao mesmo tempo."""
+    if collection_running(session.get_bind()):
+        return _redirect("/admin/coletas", msg="collect_busy")
+    background.add_task(manual_collection, settings)
+    return _redirect("/admin/coletas", msg="collect_started")

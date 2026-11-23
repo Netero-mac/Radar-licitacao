@@ -247,3 +247,8 @@ textarea:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; 
 .data-table .num { text-align: right; font-variant-numeric: tabular-nums; white-space: nowrap; }
 .data-table { overflow-x: auto; }
 @media (prefers-color-scheme: dark) { .data-table summary { color: var(--accent); } }
+
+/* Coletas (admin) */
+.admin-nav { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+.status-failed { background: var(--error-bg); color: var(--error-text); }
+button:disabled { opacity: 0.55; cursor: not-allowed; }

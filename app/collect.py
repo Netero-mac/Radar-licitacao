@@ -8,7 +8,9 @@
 Depois da coleta, as licitações novas são cruzadas com os alertas ativos (o envio do
 resumo é feito por "python -m app.notify").
 
-Sai com código 0 em caso de sucesso e 1 se a coleta falhar.
+Só uma coleta roda por vez (trava no banco, compartilhada com o agendador e com o botão
+"Coletar agora"). Sai com código 0 em caso de sucesso, 1 se a coleta falhar e 2 se outra
+coleta já estiver em andamento.
 """
 
 import argparse
@@ -18,17 +20,18 @@ from collections.abc import Sequence
 from datetime import date
 from zoneinfo import ZoneInfo
 
-from app.collectors.pncp import PncpClient
 from app.collectors.pncp.modalities import MODALITIES
 from app.config import get_settings
 from app.db import get_sessionmaker
 from app.geo import STATES
 from app.logging_config import configure_logging
-from app.models import CollectionStatus, CollectionTrigger
-from app.services.alerts import match_new_tenders
-from app.services.collection import default_period, run_collection
+from app.models import CollectionTrigger
+from app.services.collection import default_period
+from app.services.pipeline import run_pipeline
 
 logger = logging.getLogger("app.collect")
+
+EXIT_BUSY = 2
 
 
 def _iso_date(value: str) -> date:
@@ -101,27 +104,26 @@ def main(argv: Sequence[str] | None = None) -> int:
     settings = get_settings()
     configure_logging(settings.log_level, settings.log_format)
     source_tz = ZoneInfo(settings.pncp_timezone)
-
     date_from, date_to = resolve_period(
         args.date_from, args.date_to, settings.collection_lookback_days, source_tz
     )
     if date_from > date_to:
         parser.error("--from não pode ser posterior a --to")
 
-    with get_sessionmaker()() as session, PncpClient.from_settings(settings) as client:
-        run = run_collection(
-            session,
-            client,
-            date_from=date_from,
-            date_to=date_to,
-            states=args.states if args.states is not None else settings.pncp_states,
-            modalities=args.modalities or settings.pncp_modalities,
-            source_tz=source_tz,
-            trigger=CollectionTrigger.CLI,
-        )
-        # Mesmo numa coleta que falhou no meio, as páginas salvas já podem casar com alertas.
-        match_new_tenders(session, created_since=run.started_at)
-    return 0 if run.status == CollectionStatus.SUCCESS else 1
+    result = run_pipeline(
+        settings,
+        get_sessionmaker(),
+        trigger=CollectionTrigger.CLI,
+        send_notifications=False,
+        date_from=date_from,
+        date_to=date_to,
+        states=args.states,
+        modalities=args.modalities,
+    )
+    if result.skipped:
+        logger.error("Outra coleta está em andamento; tente de novo quando ela terminar.")
+        return EXIT_BUSY
+    return 0 if result.ok else 1
 
 
 if __name__ == "__main__":

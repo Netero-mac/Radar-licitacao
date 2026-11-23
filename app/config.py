@@ -49,6 +49,10 @@ class Settings(BaseSettings):
     pncp_timezone: str = "America/Sao_Paulo"
     collection_lookback_days: int = Field(default=2, ge=1)
 
+    # --- Agendamento (python -m app.scheduler): coleta -> alertas -> resumos ---
+    schedule_hours: Annotated[list[int], NoDecode] = Field(default_factory=lambda: [7, 18])
+    schedule_timezone: str = "America/Cuiaba"
+
     # Endereço público da aplicação, usado nos links dos e-mails e do Telegram.
     app_base_url: str = "http://localhost:8000"
 
@@ -102,6 +106,21 @@ class Settings(BaseSettings):
         if isinstance(value, str):
             return [int(part) for part in value.split(",") if part.strip()]
         return value
+
+    @field_validator("schedule_hours", mode="before")
+    @classmethod
+    def _parse_hours(cls, value: object) -> object:
+        """SCHEDULE_HOURS=7,18."""
+        if isinstance(value, str):
+            return [int(part) for part in value.split(",") if part.strip()]
+        return value
+
+    @field_validator("schedule_hours")
+    @classmethod
+    def _check_hours(cls, value: list[int]) -> list[int]:
+        if not value or any(not 0 <= hour <= 23 for hour in value):
+            raise ValueError("informe horas entre 0 e 23, separadas por vírgula")
+        return sorted(set(value))
 
     @field_validator("pncp_states", mode="before")
     @classmethod

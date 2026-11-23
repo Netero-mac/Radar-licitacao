@@ -8,6 +8,7 @@ from app import collect
 from app.config import DEFAULT_MODALITIES, Settings
 from app.models import CollectionStatus, CollectionTrigger
 from app.services.collection import default_period
+from app.services.pipeline import PipelineResult
 
 CUIABA = ZoneInfo("America/Cuiaba")
 
@@ -53,27 +54,26 @@ def test_resolve_periodo_completa_datas_ausentes() -> None:
 
 
 def test_main_executa_coleta_e_retorna_codigo(monkeypatch: pytest.MonkeyPatch) -> None:
-    run = MagicMock(status=CollectionStatus.SUCCESS)
-    run_collection = MagicMock(return_value=run)
-    monkeypatch.setattr(collect, "run_collection", run_collection)
+    result = PipelineResult(run=MagicMock(status=CollectionStatus.SUCCESS))
+    run_pipeline = MagicMock(return_value=result)
+    monkeypatch.setattr(collect, "run_pipeline", run_pipeline)
     monkeypatch.setattr(collect, "get_sessionmaker", lambda: MagicMock())
-    monkeypatch.setattr(collect, "PncpClient", MagicMock())
-    match_new_tenders = MagicMock()
-    monkeypatch.setattr(collect, "match_new_tenders", match_new_tenders)
 
     assert collect.main(["--from", "2026-11-01", "--to", "2026-11-22"]) == 0
-    # depois da coleta, as licitações novas são cruzadas com os alertas
-    assert match_new_tenders.call_args.kwargs == {"created_since": run.started_at}
 
-    kwargs = run_collection.call_args.kwargs
+    kwargs = run_pipeline.call_args.kwargs
     assert kwargs["date_from"] == date(2026, 11, 1)
     assert kwargs["date_to"] == date(2026, 11, 22)
     assert kwargs["trigger"] == CollectionTrigger.CLI
-    assert kwargs["states"] == ["MT"]
+    assert kwargs["send_notifications"] is False  # o resumo é do agendador / app.notify
+    assert kwargs["states"] is None  # usa PNCP_STATES
 
-    run.status = CollectionStatus.FAILED
+    result.run.status = CollectionStatus.FAILED
     assert collect.main(["--ufs", "br"]) == 1
-    assert run_collection.call_args.kwargs["states"] == []
+    assert run_pipeline.call_args.kwargs["states"] == []
+
+    run_pipeline.return_value = PipelineResult(skipped=True)
+    assert collect.main([]) == collect.EXIT_BUSY
 
 
 def test_main_rejeita_periodo_invertido() -> None:

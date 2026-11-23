@@ -1,0 +1,68 @@
+{% extends "base.html" %}
+
+{% block title %}Coletas · Radar de Licitações{% endblock %}
+
+{% block content %}
+{% include "admin/_nav.html" %}
+<div class="page-header">
+  <h1 class="page-title">Coletas</h1>
+  <form method="post" action="/admin/coletas/agora">
+    <button type="submit" class="button"{% if running %} disabled{% endif %}>Coletar agora</button>
+  </form>
+</div>
+
+{% if flash %}
+<p class="notice {{ 'notice-error' if flash_error else 'notice-success' }}" role="status">{{ flash }}</p>
+{% endif %}
+{% if running %}
+<p class="notice notice-warning" role="status">Há uma coleta em andamento agora. Atualize a página para acompanhar.</p>
+{% endif %}
+
+<p class="muted">
+  Coleta automática às {% for hour in schedule_hours %}{{ hour }}h{% if not loop.last %} e {% endif %}{% endfor %} ({{ schedule_tz }}): coleta, cruzamento com os alertas e envio dos resumos.
+  {% if next_runs %}Próxima: {{ next_runs[0].strftime("%d/%m/%Y às %H:%M") }} ({{ schedule_tz }}).{% endif %}
+  O botão "Coletar agora" busca os últimos dias e cruza com os alertas; os resumos saem no próximo horário
+  (ou pelo botão na tela de alertas).
+</p>
+
+{% if runs %}
+<div class="table-wrap">
+<table class="table">
+  <thead>
+    <tr>
+      <th scope="col">Início</th>
+      <th scope="col">Origem</th>
+      <th scope="col">Situação</th>
+      <th scope="col">Período</th>
+      <th scope="col">UFs</th>
+      <th scope="col" class="num">Páginas</th>
+      <th scope="col" class="num">Novas</th>
+      <th scope="col" class="num">Atualizadas</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for run in runs %}
+    <tr>
+      <td>{{ run.started_at | datetime_br }}{% if run.finished_at %}<div class="muted small">{{ ((run.finished_at - run.started_at).total_seconds() | round | int) }} s</div>{% endif %}</td>
+      <td>{{ {"scheduled": "Agendada", "manual": "Botão", "cli": "Linha de comando"}[run.trigger.value] }}</td>
+      <td>
+        {% if run.status.value == "success" %}<span class="status status-open">Concluída</span>
+        {% elif run.status.value == "running" %}<span class="status status-closed">Em andamento</span>
+        {% else %}<span class="status status-failed">Falhou</span>
+          {% if run.error_message %}<div class="muted small">{{ run.error_message | truncate(160) }}</div>{% endif %}
+        {% endif %}
+      </td>
+      <td class="small">{{ run.date_from | day_br }} a {{ run.date_to | day_br }}</td>
+      <td class="small">{{ run.states | join(", ") if run.states else "Brasil" }}</td>
+      <td class="num">{{ run.pages_fetched | number }}</td>
+      <td class="num">{{ run.tenders_new | number }}</td>
+      <td class="num">{{ run.tenders_updated | number }}</td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<p class="empty-state card">Nenhuma coleta registrada ainda.</p>
+{% endif %}
+{% endblock %}
