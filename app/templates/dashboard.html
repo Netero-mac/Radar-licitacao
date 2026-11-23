@@ -62,7 +62,13 @@
   <div class="card kpi">
     <span class="kpi-label">Valor estimado</span>
     <strong class="kpi-value" title="{{ summary.total_value | brl }}">{{ summary.total_value | brl_compact }}</strong>
-    {% if summary.without_value %}<span class="kpi-note">{{ summary.without_value | number }} sem valor informado</span>{% endif %}
+    {% if summary.without_value or summary.secret_value %}
+    <span class="kpi-note">
+      {%- if summary.without_value %}{{ summary.without_value | number }} sem valor informado{% endif %}
+      {%- if summary.without_value and summary.secret_value %} · {% endif %}
+      {%- if summary.secret_value %}{{ summary.secret_value | number }} sigilosa(s){% endif -%}
+    </span>
+    {% endif %}
   </div>
   <div class="card kpi">
     <span class="kpi-label">Com propostas abertas</span>

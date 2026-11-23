@@ -26,7 +26,7 @@
     </h2>
     <p class="tender-agency">{{ tender.agency_name }}</p>
     <div class="tender-footer">
-      <span class="value">{{ tender.estimated_value | brl }}</span>
+      <span class="value">{{ tender.estimated_value | estimated_value }}</span>
       {% if tender.proposals_open %}
         <span class="status status-open">Propostas até {{ tender.proposals_close_at | datetime_br }} ({{ tz_label }})</span>
       {% elif tender.proposals_close_at %}

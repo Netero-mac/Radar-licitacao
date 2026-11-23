@@ -490,8 +490,9 @@ tests/            unit/ e integration/
   no período coletado. O PNCP tem o endpoint `/v1/contratacoes/atualizacao`, um próximo passo
   natural.
 - **Valor estimado zero:** alguns órgãos publicam `R$ 0,00`, geralmente por orçamento sigiloso;
-  a API não tem um campo que diga isso. Nos alertas, o zero é tratado como sigiloso: entra em
-  qualquer faixa de valor e aparece como "Sigiloso". Na lista de licitações e no painel, continua
-  aparecendo como R$ 0,00.
+  a API não tem um campo que diga isso. O sistema trata o zero como sigiloso: aparece como
+  "Sigiloso" na lista, no detalhe e nos resumos, entra em qualquer faixa de valor dos alertas e é
+  contado à parte nos totais do painel. Nos filtros de valor da lista (e da API), só entram
+  licitações com valor conhecido.
 - **Categorias imperfeitas:** são uma aproximação por palavras-chave. Uma licitação pode cair em
   mais de uma ou em nenhuma.

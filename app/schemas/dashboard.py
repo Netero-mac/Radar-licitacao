@@ -80,6 +80,9 @@ class Summary(BaseModel):
     tenders: int
     total_value: Decimal = Field(description="Soma dos valores estimados informados")
     without_value: int = Field(description="Licitações sem valor estimado (fora da soma)")
+    secret_value: int = Field(
+        description="Licitações com valor zero, que no PNCP indica orçamento sigiloso"
+    )
     open_now: int = Field(description="Ainda recebendo propostas")
     municipalities: int
 

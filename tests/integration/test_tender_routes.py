@@ -250,3 +250,17 @@ def test_api_filtra_por_uf(client: TestClient, db_session: Session, seeded: dict
     assert client.get("/api/municipalities", params={"state": "sp"}).json() == [
         {"ibge_code": "3550308", "name": "São Paulo"}
     ]
+
+
+def test_valor_zero_aparece_como_sigiloso(client: TestClient, db_session: Session) -> None:
+    tender = make_tender(
+        db_session, object_description="Aquisição de medicamentos", estimated_value=Decimal("0")
+    )
+    db_session.commit()
+
+    listing = client.get("/").text
+    detail = client.get(f"/licitacoes/{tender.id}").text
+
+    for html in (listing, detail):
+        assert "Sigiloso" in html
+        assert "R$ 0,00" not in html

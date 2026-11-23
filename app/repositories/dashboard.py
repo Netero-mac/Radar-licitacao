@@ -23,6 +23,7 @@ class Totals:
     tenders: int
     total_value: Decimal
     without_value: int
+    secret_value: int
     open_now: int
     municipalities: int
 
@@ -44,6 +45,7 @@ def totals(session: Session, conditions: Conditions, *, open_at: datetime) -> To
             func.count(),
             _VALUE,
             func.count().filter(Tender.estimated_value.is_(None)),
+            func.count().filter(Tender.estimated_value == 0),
             func.count().filter(Tender.proposals_close_at > open_at),
             func.count(func.distinct(Tender.municipality_ibge_code)),
         ).where(*conditions)

@@ -53,6 +53,7 @@ def summary(session: Session, filters: DashboardFilters, tz: ZoneInfo, now: date
         tenders=totals.tenders,
         total_value=totals.total_value,
         without_value=totals.without_value,
+        secret_value=totals.secret_value,
         open_now=totals.open_now,
         municipalities=totals.municipalities,
     )

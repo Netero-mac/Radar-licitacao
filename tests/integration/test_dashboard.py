@@ -236,3 +236,19 @@ def test_tela_sem_dados_e_filtro_invalido(client: TestClient) -> None:
     assert "Período: escolha 3, 6, 12 ou 24 meses" in html
     assert "Nenhuma licitação publicada neste período" in html
     assert "data-chart " not in html
+
+
+def test_painel_conta_as_sigilosas(client: TestClient, db_session: Session) -> None:
+    now = datetime.now(UTC)
+    make_tender(db_session, published_at=now, estimated_value=Decimal("0"))
+    make_tender(db_session, published_at=now, estimated_value=Decimal("0"))
+    make_tender(db_session, published_at=now, estimated_value=None)
+    make_tender(db_session, published_at=now, estimated_value=Decimal("500"))
+    db_session.commit()
+
+    summary = client.get("/api/dashboard/summary").json()
+    html = client.get("/painel").text
+
+    assert (summary["secret_value"], summary["without_value"]) == (2, 1)
+    assert summary["total_value"] == "500.0000"
+    assert "1 sem valor informado · 2 sigilosa(s)" in html
