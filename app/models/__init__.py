@@ -5,9 +5,10 @@ from app.models.alert import Alert, AlertMatch
 from app.models.base import Base
 from app.models.collection_run import CollectionRun
 from app.models.enums import CollectionStatus, CollectionTrigger, Sphere
-from app.models.tender import Tender
+from app.models.tender import ACTIVE_STATUS_CODE, Tender
 
 __all__ = [
+    "ACTIVE_STATUS_CODE",
     "Agency",
     "Alert",
     "AlertMatch",

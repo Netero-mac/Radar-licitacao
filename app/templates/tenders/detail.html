@@ -8,7 +8,8 @@
 <article class="detail">
   <div class="tender-meta">
     <span class="tag">{{ tender.modality_name }}</span>
-    <span>{{ tender.status }}</span>
+    {% if tender.status_code == 1 %}<span>{{ tender.status }}</span>
+    {% else %}<span class="status status-cancelled">{{ tender.status }}</span>{% endif %}
   </div>
   <h1 class="detail-title">{{ tender.object_description }}</h1>
 
@@ -21,7 +22,9 @@
       <span class="label">Recebimento de propostas ({{ tz_label }})</span>
       {% if tender.proposals_close_at %}
         <span>{{ tender.proposals_open_at | datetime_br }} até {{ tender.proposals_close_at | datetime_br }}</span>
-        {% if tender.proposals_open %}
+        {% if tender.status_code != 1 %}
+          <span class="status status-cancelled">{{ tender.status }}</span>
+        {% elif tender.proposals_open %}
           <span class="status status-open">Aberto</span>
         {% else %}
           <span class="status status-closed">Encerrado</span>

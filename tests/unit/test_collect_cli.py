@@ -67,6 +67,10 @@ def test_main_executa_coleta_e_retorna_codigo(monkeypatch: pytest.MonkeyPatch) -
     assert kwargs["trigger"] == CollectionTrigger.CLI
     assert kwargs["send_notifications"] is False  # o resumo é do agendador / app.notify
     assert kwargs["states"] is None  # usa PNCP_STATES
+    assert kwargs["include_updates"] is True
+
+    collect.main(["--from", "2026-09-01", "--sem-atualizacoes"])
+    assert run_pipeline.call_args.kwargs["include_updates"] is False
 
     result.run.status = CollectionStatus.FAILED
     assert collect.main(["--ufs", "br"]) == 1

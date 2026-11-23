@@ -22,7 +22,7 @@ LONG_AGO = datetime(2000, 1, 1, tzinfo=UTC)
 
 
 def _match_all(session: Session) -> int:
-    return service.match_new_tenders(session, created_since=LONG_AGO)
+    return service.match_new_tenders(session, created_since=LONG_AGO, now=NOW)
 
 
 def _matched(session: Session, alert: Alert) -> set[int]:
@@ -179,7 +179,9 @@ def test_so_cruza_licitacoes_criadas_depois_da_coleta(db_session: Session) -> No
     db_session.commit()
     db_session.refresh(new)
 
-    service.match_new_tenders(db_session, created_since=new.created_at - timedelta(seconds=1))
+    service.match_new_tenders(
+        db_session, created_since=new.created_at - timedelta(seconds=1), now=NOW
+    )
 
     assert _matched(db_session, alert) == {new.id}
 
@@ -299,3 +301,40 @@ def test_exclusao_e_precedencia_com_plural(db_session: Session) -> None:
     _match_all(db_session)
 
     assert _matched(db_session, alert) == {truck.id, bus.id}
+
+
+# --- Situação e prazo ------------------------------------------------------------------
+
+
+@pytest.mark.parametrize(("code", "name"), [(2, "Revogada"), (3, "Anulada"), (4, "Suspensa")])
+def test_licitacao_que_nao_esta_valendo_nao_casa(db_session: Session, code: int, name: str) -> None:
+    alert = make_alert(db_session, keywords=["computador"])
+    make_tender(
+        db_session, object_description="Aquisição de computadores", status_code=code, status=name
+    )
+
+    _match_all(db_session)
+
+    assert _matched(db_session, alert) == set()
+
+
+def test_licitacao_nova_com_prazo_vencido_nao_casa(db_session: Session) -> None:
+    # As atualizações do PNCP trazem licitações antigas que o sistema ainda não conhecia.
+    alert = make_alert(db_session, keywords=["computador"])
+    make_tender(
+        db_session,
+        object_description="Aquisição de computadores (prazo vencido)",
+        proposals_close_at=NOW - timedelta(minutes=1),
+    )
+    open_ = make_tender(
+        db_session,
+        object_description="Aquisição de computadores (aberta)",
+        proposals_close_at=NOW + timedelta(days=5),
+    )
+    no_deadline = make_tender(
+        db_session, object_description="Aquisição de computadores (sem prazo)"
+    )
+
+    _match_all(db_session)
+
+    assert _matched(db_session, alert) == {open_.id, no_deadline.id}

@@ -117,9 +117,20 @@ def test_filtro_de_propostas_abertas_usa_o_instante_atual() -> None:
 def test_prazo_de_propostas(
     open_at: datetime | None, close_at: datetime | None, expected: bool
 ) -> None:
-    tender = SimpleNamespace(proposals_open_at=open_at, proposals_close_at=close_at)
+    tender = SimpleNamespace(status_code=1, proposals_open_at=open_at, proposals_close_at=close_at)
 
     assert proposals_open(tender, NOW) is expected  # type: ignore[arg-type]
+
+
+@pytest.mark.parametrize("status_code", [2, 3, 4])
+def test_revogada_anulada_ou_suspensa_nao_esta_aberta(status_code: int) -> None:
+    tender = SimpleNamespace(
+        status_code=status_code,
+        proposals_open_at=None,
+        proposals_close_at=datetime(2026, 11, 30, tzinfo=UTC),
+    )
+
+    assert proposals_open(tender, NOW) is False  # type: ignore[arg-type]
 
 
 def test_extras_do_registro_original() -> None:

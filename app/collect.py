@@ -84,6 +84,13 @@ def build_parser() -> argparse.ArgumentParser:
         type=_states,
         help="UFs separadas por vírgula, ou BR para o Brasil inteiro (padrão: PNCP_STATES)",
     )
+    parser.add_argument(
+        "--sem-atualizacoes",
+        dest="include_updates",
+        action="store_false",
+        help="só o que foi publicado no período, sem buscar as alterações (mais rápido em "
+        "cargas históricas grandes)",
+    )
     return parser
 
 
@@ -119,6 +126,7 @@ def main(argv: Sequence[str] | None = None) -> int:
         date_to=date_to,
         states=args.states,
         modalities=args.modalities,
+        include_updates=args.include_updates,
     )
     if result.skipped:
         logger.error("Outra coleta está em andamento; tente de novo quando ela terminar.")

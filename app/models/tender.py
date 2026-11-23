@@ -15,6 +15,10 @@ if TYPE_CHECKING:
 # Configuração de busca criada na migration inicial: dicionário portuguese + unaccent.
 SEARCH_CONFIG = "pt_unaccent"
 
+# Situação da contratação no PNCP (situacaoCompraId): 1 = Divulgada no PNCP, 2 = Revogada,
+# 3 = Anulada, 4 = Suspensa. Só a 1 está valendo; as outras chegam pelas atualizações.
+ACTIVE_STATUS_CODE = 1
+
 
 class Tender(TimestampMixin, Base):
     """Contratação publicada no PNCP."""

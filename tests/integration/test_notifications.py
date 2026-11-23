@@ -10,7 +10,7 @@ import respx
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.models import AlertMatch
+from app.models import AlertMatch, Tender
 from app.notifiers.email import EmailError
 from app.notifiers.telegram import TelegramClient
 from app.services import alerts as alert_service
@@ -78,7 +78,7 @@ def scenario(db_session: Session) -> dict[str, int]:
         db_session, object_description="Reforma da escola municipal", estimated_value=Decimal("0")
     )
     make_alert(db_session, name="Inativo", keywords=["computador"], active=False)
-    alert_service.match_new_tenders(db_session, created_since=NOW - timedelta(days=3650))
+    alert_service.match_new_tenders(db_session, created_since=NOW - timedelta(days=3650), now=NOW)
     return {"ti": ti.id, "obras": obras.id}
 
 
@@ -213,3 +213,31 @@ def test_valor_zero_aparece_como_sigiloso(
     assert "Sigiloso" in _html(obras)
     assert "Valor estimado: Sigiloso" in _text(obras)
     assert "R$ 0,00" not in _html(obras)
+
+
+def test_licitacao_revogada_depois_do_casamento_nao_vai_no_resumo(
+    db_session: Session, scenario: dict[str, int]
+) -> None:
+    reforma = db_session.scalars(
+        select(Tender).where(Tender.object_description == "Reforma da escola municipal")
+    ).one()
+    reforma.status_code, reforma.status = 2, "Revogada"
+    db_session.flush()
+    sender = FakeEmailSender()
+
+    report = send_digests(db_session, email_sender=sender, telegram=None, ctx=CTX, now=NOW)
+
+    assert [message["To"] for message in sender.sent] == ["ti@empresa.com"]
+    assert report.tenders_notified == 2
+    # Continua pendente: se voltar a valer (fim de uma suspensão), sai no próximo resumo.
+    pending = db_session.scalars(
+        select(AlertMatch).where(
+            AlertMatch.tender_id == reforma.id, AlertMatch.notified_at.is_(None)
+        )
+    ).all()
+    assert len(pending) == 1
+
+    reforma.status_code, reforma.status = 1, "Divulgada no PNCP"
+    db_session.flush()
+    send_digests(db_session, email_sender=sender, telegram=None, ctx=CTX, now=NOW)
+    assert [message["To"] for message in sender.sent][-1] == "obras@empresa.com"

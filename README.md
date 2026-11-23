@@ -20,7 +20,8 @@ região. Duas vezes por dia ela recebe as licitações novas que casam com esse 
 ## O que ele faz
 
 - **Coleta** as contratações do PNCP às 7h e 18h, com novas tentativas, paginação completa e
-  sem duplicar registros.
+  sem duplicar registros. Também acompanha as **alterações**: prazo prorrogado, revogação,
+  anulação e suspensão.
 - **Busca** no objeto da licitação ignorando acentos e maiúsculas e achando singular e plural.
   Filtra por UF, município, modalidade, faixa de valor, período e "propostas ainda abertas".
 - **Alertas** por palavra-chave, UF/município e faixa de valor, com resumo por e-mail e,
@@ -32,7 +33,7 @@ região. Duas vezes por dia ela recebe as licitações novas que casam com esse 
 
 ```mermaid
 flowchart LR
-    PNCP[(API do PNCP<br>/v1/contratacoes/publicacao)]
+    PNCP[(API do PNCP<br>publicações e atualizações)]
     subgraph Agendador["Agendador (7h e 18h)"]
         direction TB
         L{{Trava no banco:<br>uma coleta por vez}} --> C[Coleta<br>paginada, com retry]
@@ -193,7 +194,8 @@ Os filtros:
 - modalidade;
 - faixa de valor estimado (licitações sem valor informado ou sigilosas sempre entram);
 - período de publicação;
-- "só com propostas ainda abertas", que inclui as que ainda vão abrir.
+- "só com propostas ainda abertas", que inclui as que ainda vão abrir e exclui as revogadas,
+  anuladas e suspensas.
 
 Com mais de uma UF coletada, a tela pede a UF antes de listar os municípios.
 
@@ -212,8 +214,20 @@ As telas funcionam sem JavaScript. Com ele, o HTMX atualiza só a lista ao mudar
 ## Coleta do PNCP
 
 A coleta usa a [API pública de consulta do PNCP](https://pncp.gov.br/api/consulta/swagger-ui/index.html),
-no endpoint `/v1/contratacoes/publicacao`. A API exige uma modalidade por consulta, então cada
-execução percorre as modalidades de `PNCP_MODALITIES`, página a página.
+em duas passagens sobre o mesmo período:
+
+1. `/v1/contratacoes/publicacao`: o que foi **publicado** no período;
+2. `/v1/contratacoes/atualizacao`: o que foi **alterado** no período, inclusive licitações
+   publicadas meses antes. É assim que chegam prazos prorrogados, editais retificados e as
+   situações "Revogada", "Anulada" e "Suspensa".
+
+A API exige uma modalidade por consulta, então cada passagem percorre as modalidades de
+`PNCP_MODALITIES`, página a página.
+
+**Situação da licitação:** uma licitação revogada, anulada ou suspensa aparece com essa
+situação na lista e no detalhe, deixa de contar como "propostas abertas" e não vai nos resumos.
+Se um casamento com alerta ainda não tinha sido enviado e a licitação foi suspensa, ele fica
+pendente e sai no próximo resumo caso a suspensão termine.
 
 **Abrangência (`PNCP_STATES`):** uma lista de UFs (`MT`, `MT,MS,GO`...) ou vazio/`BR` para o
 Brasil inteiro. O padrão é `MT`.
@@ -221,8 +235,8 @@ Brasil inteiro. O padrão é `MT`.
 | | Só MT | Brasil inteiro |
 |---|---|---|
 | Licitações por dia (aprox.) | 50 a 70 | 7 mil |
-| Requisições por coleta (2 dias, todas as modalidades) | ~15 | ~300 |
-| Tempo por coleta | segundos | 10 a 30 min (limite de requisições do PNCP) |
+| Requisições por coleta (2 dias, todas as modalidades, com atualizações) | ~30 | ~600 |
+| Tempo por coleta | 1 a 2 min | 20 a 60 min (limite de requisições do PNCP) |
 | Crescimento do banco | dezenas de MB/ano | 8 a 10 GB/ano |
 
 ```bash
@@ -230,7 +244,11 @@ python -m app.collect                                    # últimos 2 dias (padr
 python -m app.collect --from 2026-11-01 --to 2026-11-22  # período específico
 python -m app.collect --modalidades 6,8                  # só pregão eletrônico e dispensa
 python -m app.collect --ufs MT,MS                        # outras UFs (ou --ufs BR)
+python -m app.collect --from 2026-01-01 --sem-atualizacoes  # carga histórica, só publicações
 ```
+
+Em cargas históricas longas, `--sem-atualizacoes` economiza tempo: a passagem de atualizações
+traria tudo o que foi alterado desde a data inicial, inclusive licitações de anos anteriores.
 
 - **Sem duplicatas:** cada contratação é gravada pelo número de controle do PNCP (upsert).
   Coletar o mesmo período de novo só atualiza o que mudou.
@@ -283,6 +301,9 @@ sem elas, a área administrativa fica desativada. Cada alerta tem:
 Como os alertas funcionam:
 
 - Ao criar um alerta, ele já é cruzado com as licitações que ainda aceitam propostas.
+- Depois de cada coleta, as licitações novas são cruzadas com os alertas. Ficam de fora as de
+  prazo já encerrado (a passagem de atualizações traz muitas licitações antigas) e as
+  revogadas, anuladas ou suspensas.
 - Cada canal (e-mail e Telegram) tem sua própria marca de envio, então uma licitação nunca sai
   duas vezes pelo mesmo canal.
 - Se um envio falha, a licitação continua pendente e vai no próximo resumo.
@@ -458,6 +479,9 @@ tests/            unit/ e integration/
   (`app/search_query.py`).
 - **Sintaxe de busca do `websearch_to_tsquery`** (`"frase"`, `OR`, `-palavra`): é familiar, não
   dá erro de sintaxe com o que o usuário digitar e é a mesma na tela e nos alertas.
+- **Duas passagens por coleta (publicações e atualizações)** em vez de só reconsultar o que já
+  está no banco. O PNCP devolve o registro completo e atual nas duas, então o mesmo upsert serve
+  para ambas, e licitações antigas que o sistema nunca viu também chegam.
 - **Upsert pelo número de controle do PNCP**, só quando o JSON original muda. Coletar de novo o
   mesmo período é seguro e barato, e o `raw_data` guarda a resposta original para reprocessar
   depois sem chamar a API.
@@ -485,10 +509,9 @@ tests/            unit/ e integration/
 
 ## Limitações conhecidas
 
-- **Licitações alteradas depois de publicadas:** a coleta usa as datas de publicação. Uma
-  licitação alterada dias depois (prazo prorrogado, por exemplo) só é atualizada se cair de novo
-  no período coletado. O PNCP tem o endpoint `/v1/contratacoes/atualizacao`, um próximo passo
-  natural.
+- **Alterações fora do período coletado:** cada coleta busca as alterações dos últimos
+  `COLLECTION_LOOKBACK_DAYS` dias. Se o sistema ficar parado mais do que isso, as alterações do
+  intervalo só chegam com uma coleta manual desse período (`python -m app.collect --from ...`).
 - **Valor estimado zero:** alguns órgãos publicam `R$ 0,00`, geralmente por orçamento sigiloso;
   a API não tem um campo que diga isso. O sistema trata o zero como sigiloso: aparece como
   "Sigiloso" na lista, no detalhe e nos resumos, entra em qualquer faixa de valor dos alertas e é

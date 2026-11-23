@@ -85,6 +85,21 @@ def test_resumo(db_session: Session, data: None) -> None:
     assert (mt.tenders, mt.municipalities) == (5, 3)
 
 
+def test_revogada_nao_conta_como_aberta(db_session: Session) -> None:
+    _tender(db_session, NOW, proposals_close_at=NOW + timedelta(days=3))
+    _tender(
+        db_session,
+        NOW,
+        proposals_close_at=NOW + timedelta(days=3),
+        status_code=2,
+        status="Revogada",
+    )
+
+    summary = service.summary(db_session, FILTERS, BRASILIA, NOW)
+
+    assert (summary.tenders, summary.open_now) == (2, 1)
+
+
 def test_ranking_de_municipios_por_quantidade_e_por_valor(db_session: Session, data: None) -> None:
     by_count = service.municipalities(db_session, FILTERS, RankingParams(limit=2), BRASILIA, NOW)
     by_value = service.municipalities(

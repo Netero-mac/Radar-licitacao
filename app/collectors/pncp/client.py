@@ -24,6 +24,7 @@ from app.config import Settings
 logger = logging.getLogger(__name__)
 
 PUBLISHED_PATH = "/v1/contratacoes/publicacao"
+UPDATED_PATH = "/v1/contratacoes/atualizacao"
 # Teto para um Retry-After absurdo não travar a coleta.
 MAX_RETRY_AFTER_SECONDS = 600.0
 
@@ -36,6 +37,19 @@ class PncpError(Exception):
 
 def _format_date(value: date) -> str:
     return value.strftime("%Y%m%d")
+
+
+def _window_params(
+    date_from: date, date_to: date, modality: int, state: str | None
+) -> dict[str, Any]:
+    params: dict[str, Any] = {
+        "dataInicial": _format_date(date_from),
+        "dataFinal": _format_date(date_to),
+        "codigoModalidadeContratacao": modality,
+    }
+    if state:
+        params["uf"] = state
+    return params
 
 
 def _retry_after_seconds(response: httpx.Response) -> float | None:
@@ -122,14 +136,17 @@ class PncpClient:
 
         Sem ``state``, consulta o Brasil inteiro.
         """
-        params: dict[str, Any] = {
-            "dataInicial": _format_date(date_from),
-            "dataFinal": _format_date(date_to),
-            "codigoModalidadeContratacao": modality,
-        }
-        if state:
-            params["uf"] = state
-        return self._iter_pages(PUBLISHED_PATH, params)
+        return self._iter_pages(PUBLISHED_PATH, _window_params(date_from, date_to, modality, state))
+
+    def iter_updated(
+        self, date_from: date, date_to: date, modality: int, state: str | None = None
+    ) -> Iterator[PncpPage]:
+        """Contratações com alguma alteração no período (dataAtualizacaoGlobal), inclusive as
+        publicadas antes dele: prazo prorrogado, revogação, suspensão, retificação do edital.
+
+        Mesmo formato de registro de ``iter_published``.
+        """
+        return self._iter_pages(UPDATED_PATH, _window_params(date_from, date_to, modality, state))
 
     def _iter_pages(self, path: str, params: dict[str, Any]) -> Iterator[PncpPage]:
         page_number = 1

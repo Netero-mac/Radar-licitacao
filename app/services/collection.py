@@ -65,11 +65,16 @@ def run_collection(
     modalities: Sequence[int],
     source_tz: ZoneInfo,
     trigger: CollectionTrigger,
+    include_updates: bool = True,
 ) -> CollectionRun:
     """Executa uma coleta completa e devolve o registro em collection_runs.
 
     ``states`` vazio coleta o Brasil inteiro numa consulta só (sem filtro de UF), o que
     exige bem menos requisições do que percorrer as 27 UFs.
+
+    Além do que foi publicado no período, busca o que foi *alterado* nele
+    (``include_updates``): prazos prorrogados, revogações e suspensões de licitações
+    publicadas antes. Sem isso, elas ficariam com o dado antigo para sempre.
 
     Cada página é gravada e confirmada (commit) assim que chega: se a API cair no meio,
     o que já veio fica salvo e a próxima execução completa o resto. Falhas não são
@@ -87,12 +92,16 @@ def run_collection(
         "date_from": date_from.isoformat(),
         "date_to": date_to.isoformat(),
         "states": ",".join(states) or "BR",
+        "include_updates": include_updates,
     }
     logger.info("Coleta iniciada", extra=log_extra)
 
     try:
-        for state, modality in product(states or [None], modalities):
-            for page in client.iter_published(date_from, date_to, modality, state):
+        sources = [("publicacao", client.iter_published)]
+        if include_updates:
+            sources.append(("atualizacao", client.iter_updated))
+        for (source, fetch), state, modality in product(sources, states or [None], modalities):
+            for page in fetch(date_from, date_to, modality, state):
                 result = store_page(session, page, source_tz)
                 collection_runs.add_page_stats(run, new=result.new, updated=result.updated)
                 session.commit()
@@ -100,6 +109,7 @@ def run_collection(
                     "Página gravada",
                     extra={
                         **log_extra,
+                        "source": source,
                         "state": state or "BR",
                         "modality": modality,
                         "page": page.number,

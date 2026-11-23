@@ -22,7 +22,7 @@ from sqlalchemy import (
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import InstrumentedAttribute, Session, joinedload
 
-from app.models import Alert, AlertMatch, Tender
+from app.models import ACTIVE_STATUS_CODE, Alert, AlertMatch, Tender
 from app.search_query import build_tsquery
 
 
@@ -142,9 +142,13 @@ def create_matches(
     *,
     tenders_created_since: datetime | None = None,
     proposals_open_at: datetime | None = None,
+    not_closed_at: datetime | None = None,
     alert_id: int | None = None,
 ) -> int:
     """Grava em alert_matches os pares (alerta ativo, licitação) que casam.
+
+    Só licitações valendo (não revogadas, anuladas ou suspensas). ``proposals_open_at``
+    exige prazo informado e aberto; ``not_closed_at`` aceita também as sem prazo informado.
 
     Pares já existentes são ignorados (ON CONFLICT DO NOTHING): rodar de novo não duplica
     nem "desnotifica" nada. Devolve quantos casamentos novos foram criados.
@@ -152,11 +156,15 @@ def create_matches(
     queries = _keyword_queries(session, alert_id)
     if queries is None:  # nenhum alerta ativo
         return 0
-    conditions = _match_conditions(queries)
+    conditions = [*_match_conditions(queries), Tender.status_code == ACTIVE_STATUS_CODE]
     if tenders_created_since is not None:
         conditions.append(Tender.created_at >= tenders_created_since)
     if proposals_open_at is not None:
         conditions.append(Tender.proposals_close_at > proposals_open_at)
+    if not_closed_at is not None:
+        conditions.append(
+            or_(Tender.proposals_close_at.is_(None), Tender.proposals_close_at > not_closed_at)
+        )
     if alert_id is not None:
         conditions.append(Alert.id == alert_id)
 
@@ -182,7 +190,12 @@ def alerts_with_pending(session: Session, channel: Channel) -> list[Alert]:
         select(Alert)
         .where(
             *conditions,
-            exists().where(AlertMatch.alert_id == Alert.id, sent.is_(None)),
+            exists().where(
+                AlertMatch.alert_id == Alert.id,
+                sent.is_(None),
+                AlertMatch.tender_id == Tender.id,
+                Tender.status_code == ACTIVE_STATUS_CODE,
+            ),
         )
         .order_by(Alert.id)
     )
@@ -195,7 +208,13 @@ def pending_matches(session: Session, alert_id: int, channel: Channel) -> list[A
         select(AlertMatch)
         .join(AlertMatch.tender)
         .options(joinedload(AlertMatch.tender).joinedload(Tender.agency))
-        .where(AlertMatch.alert_id == alert_id, _SENT_COLUMN[channel].is_(None))
+        .where(
+            AlertMatch.alert_id == alert_id,
+            _SENT_COLUMN[channel].is_(None),
+            # Revogada/anulada/suspensa depois do casamento: não vai no resumo. Fica pendente
+            # e sai num resumo futuro se a licitação voltar a valer (fim da suspensão).
+            Tender.status_code == ACTIVE_STATUS_CODE,
+        )
         .order_by(
             Tender.proposals_close_at.asc().nulls_last(),
             Tender.published_at.desc(),

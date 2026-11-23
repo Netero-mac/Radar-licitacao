@@ -268,3 +268,25 @@ def test_valor_zero_aparece_como_sigiloso(client: TestClient, db_session: Sessio
 
 def test_filtro_de_valor_avisa_que_inclui_sigilosas(client: TestClient) -> None:
     assert "Sem valor informado ou sigilosas também aparecem." in client.get("/").text
+
+
+def test_situacao_revogada_aparece_na_lista_e_no_detalhe(
+    client: TestClient, db_session: Session
+) -> None:
+    tender = make_tender(
+        db_session,
+        object_description="Aquisição de pneus",
+        status_code=2,
+        status="Revogada",
+        proposals_close_at=datetime(2099, 1, 1, tzinfo=UTC),
+    )
+    db_session.commit()
+
+    listing = client.get("/").text
+    detail = client.get(f"/licitacoes/{tender.id}").text
+    item = client.get(f"/api/tenders/{tender.id}").json()
+
+    assert '<span class="status status-cancelled">Revogada</span>' in listing
+    assert "Propostas até" not in listing
+    assert '<span class="status status-cancelled">Revogada</span>' in detail
+    assert (item["status_code"], item["proposals_open"]) == (2, False)

@@ -119,6 +119,9 @@ def test_somente_propostas_abertas(db_session: Session) -> None:
     )
     make_tender(db_session, proposals_close_at=NOW - timedelta(minutes=1))
     make_tender(db_session, proposals_close_at=None)
+    make_tender(  # prazo aberto, mas suspensa: não aceita propostas
+        db_session, proposals_close_at=NOW + timedelta(days=5), status_code=4, status="Suspensa"
+    )
 
     assert sorted(_ids(db_session, open_only=True)) == sorted([open_now.id, opens_later.id])
 

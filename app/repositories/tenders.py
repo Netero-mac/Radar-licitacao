@@ -10,7 +10,7 @@ from sqlalchemy import ColumnElement, func, literal_column, or_, select
 from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session, joinedload
 
-from app.models import Agency, Tender
+from app.models import ACTIVE_STATUS_CODE, Agency, Tender
 from app.search_query import build_tsquery
 
 
@@ -118,6 +118,7 @@ def filter_conditions(query: TenderQuery) -> list[ColumnElement[bool]]:
     if query.open_at is not None:
         # Inclui as que ainda vão abrir: também dá tempo de preparar a proposta.
         conditions.append(Tender.proposals_close_at > query.open_at)
+        conditions.append(Tender.status_code == ACTIVE_STATUS_CODE)
     return conditions
 
 

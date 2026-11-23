@@ -196,19 +196,24 @@ class TenderSummary(BaseModel):
     state: str
     modality_code: int
     modality_name: str
+    status_code: int = Field(
+        description="Situação no PNCP: 1 = divulgada, 2 = revogada, 3 = anulada, 4 = suspensa"
+    )
     status: str
     estimated_value: Decimal | None
     published_at: datetime
     proposals_open_at: datetime | None
     proposals_close_at: datetime | None
-    proposals_open: bool = Field(description="Prazo de propostas ainda não encerrado")
+    proposals_open: bool = Field(
+        description="Prazo de propostas ainda não encerrado e licitação não revogada, anulada "
+        "ou suspensa"
+    )
     source_url: str
 
 
 class TenderDetail(TenderSummary):
     agency: AgencyOut
     unit_name: str | None
-    status_code: int
     pncp_updated_at: datetime | None
     created_at: datetime
     updated_at: datetime

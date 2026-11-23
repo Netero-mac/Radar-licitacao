@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session
 
-from app.models import Tender
+from app.models import ACTIVE_STATUS_CODE, Tender
 from app.repositories import tenders as repository
 from app.repositories.tenders import TenderQuery
 from app.schemas.tenders import AgencyOut, TenderDetail, TenderFilters, TenderPage, TenderSummary
@@ -40,8 +40,12 @@ def build_query(filters: TenderFilters, tz: ZoneInfo, now: datetime) -> TenderQu
 
 
 def proposals_open(tender: Tender, now: datetime) -> bool:
-    """Prazo de propostas não encerrado (inclui o que ainda vai começar)."""
-    return tender.proposals_close_at is not None and tender.proposals_close_at > now
+    """Prazo de propostas não encerrado (inclui o que ainda vai começar) e licitação valendo."""
+    return (
+        tender.status_code == ACTIVE_STATUS_CODE
+        and tender.proposals_close_at is not None
+        and tender.proposals_close_at > now
+    )
 
 
 # Campos das respostas que não são colunas de Tender e são preenchidos à parte.

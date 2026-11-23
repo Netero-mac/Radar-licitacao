@@ -6,7 +6,7 @@ import pytest
 import respx
 
 from app.collectors.pncp import PncpClient, PncpError
-from app.collectors.pncp.client import MAX_RETRY_AFTER_SECONDS, PUBLISHED_PATH
+from app.collectors.pncp.client import MAX_RETRY_AFTER_SECONDS, PUBLISHED_PATH, UPDATED_PATH
 from tests.conftest import load_fixture
 
 BASE_URL = "https://pncp.test/api/consulta"
@@ -49,6 +49,22 @@ def test_envia_parametros_exigidos_pela_api(client: PncpClient, api: respx.MockR
         "dataFinal": "20261118",
         "codigoModalidadeContratacao": "6",
         "uf": "MT",
+        "pagina": "1",
+        "tamanhoPagina": "50",
+    }
+
+
+def test_alteracoes_usam_o_endpoint_de_atualizacao(
+    client: PncpClient, api: respx.MockRouter
+) -> None:
+    route = api.get(UPDATED_PATH).mock(return_value=httpx.Response(204))
+
+    list(client.iter_updated(date(2026, 11, 17), date(2026, 11, 18), 8))
+
+    assert dict(route.calls.last.request.url.params) == {
+        "dataInicial": "20261117",
+        "dataFinal": "20261118",
+        "codigoModalidadeContratacao": "8",
         "pagina": "1",
         "tamanhoPagina": "50",
     }

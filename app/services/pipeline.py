@@ -8,7 +8,7 @@ andamento, esta é pulada em vez de esperar ou duplicar trabalho.
 import logging
 from collections.abc import Callable
 from dataclasses import dataclass
-from datetime import date
+from datetime import UTC, date, datetime
 from zoneinfo import ZoneInfo
 
 from sqlalchemy.orm import Session, sessionmaker
@@ -52,7 +52,9 @@ def run_pipeline(
     date_to: date | None = None,
     states: list[str] | None = None,
     modalities: list[int] | None = None,
+    include_updates: bool = True,
     client_factory: Callable[[Settings], PncpClient] = PncpClient.from_settings,
+    clock: Callable[[], datetime] = lambda: datetime.now(UTC),
 ) -> PipelineResult:
     source_tz = ZoneInfo(settings.pncp_timezone)
     default_from, default_to = default_period(settings.collection_lookback_days, source_tz)
@@ -82,9 +84,10 @@ def run_pipeline(
                     modalities=modalities or settings.pncp_modalities,
                     source_tz=source_tz,
                     trigger=trigger,
+                    include_updates=include_updates,
                 )
             # Mesmo numa coleta que falhou no meio, as páginas salvas podem casar com alertas.
-            matches = match_new_tenders(session, created_since=run.started_at)
+            matches = match_new_tenders(session, created_since=run.started_at, now=clock())
 
             digest = None
             if send_notifications:

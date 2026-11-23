@@ -10,7 +10,7 @@ from sqlalchemy import ColumnElement, Date, cast, func, not_, or_, select, true
 from sqlalchemy.orm import Session
 
 from app.categories import Category
-from app.models import Tender
+from app.models import ACTIVE_STATUS_CODE, Tender
 from app.search_query import SEARCH_REGCONFIG
 
 Conditions = Sequence[ColumnElement[bool]]
@@ -46,7 +46,9 @@ def totals(session: Session, conditions: Conditions, *, open_at: datetime) -> To
             _VALUE,
             func.count().filter(Tender.estimated_value.is_(None)),
             func.count().filter(Tender.estimated_value == 0),
-            func.count().filter(Tender.proposals_close_at > open_at),
+            func.count().filter(
+                Tender.proposals_close_at > open_at, Tender.status_code == ACTIVE_STATUS_CODE
+            ),
             func.count(func.distinct(Tender.municipality_ibge_code)),
         ).where(*conditions)
     ).one()

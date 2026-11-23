@@ -109,9 +109,17 @@ def recent_matches(session: Session, alert_id: int) -> list[AlertMatch]:
     return repository.recent_matches(session, alert_id)
 
 
-def match_new_tenders(session: Session, created_since: datetime) -> int:
-    """Depois de uma coleta: cruza as licitações novas com todos os alertas ativos."""
-    created = repository.create_matches(session, tenders_created_since=created_since)
+def match_new_tenders(
+    session: Session, created_since: datetime, now: datetime | None = None
+) -> int:
+    """Depois de uma coleta: cruza as licitações novas com todos os alertas ativos.
+
+    Ignora as de prazo já encerrado: as atualizações do PNCP trazem licitações antigas
+    que o sistema ainda não conhecia, e avisar de prazo vencido só atrapalha.
+    """
+    created = repository.create_matches(
+        session, tenders_created_since=created_since, not_closed_at=now or datetime.now(UTC)
+    )
     session.commit()
     logger.info(
         "Cruzamento com alertas concluído",

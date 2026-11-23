@@ -1,5 +1,5 @@
 from collections.abc import Iterator
-from datetime import date
+from datetime import UTC, date, datetime
 from email.message import EmailMessage
 
 import httpx
@@ -9,7 +9,7 @@ from sqlalchemy import Engine, select
 from sqlalchemy.orm import Session, sessionmaker
 
 from app.collectors.pncp import PncpClient
-from app.collectors.pncp.client import PUBLISHED_PATH
+from app.collectors.pncp.client import PUBLISHED_PATH, UPDATED_PATH
 from app.config import Settings
 from app.models import AlertMatch, CollectionRun, CollectionStatus, CollectionTrigger
 from app.repositories import collection_runs
@@ -52,6 +52,7 @@ def api() -> Iterator[respx.MockRouter]:
         router.get(PUBLISHED_PATH, params={"pagina": "2"}).mock(
             return_value=httpx.Response(200, json=PAGE_2)
         )
+        router.get(UPDATED_PATH).mock(return_value=httpx.Response(204))
         yield router
 
 
@@ -70,6 +71,8 @@ def _run(sessions: sessionmaker[Session], **kwargs: object) -> pipeline.Pipeline
         "date_from": date(2026, 11, 17),
         "date_to": date(2026, 11, 17),
         "client_factory": _client,
+        # Relógio fixo: os prazos das respostas reais vencem e os alertas ignoram os vencidos.
+        "clock": lambda: datetime(2026, 11, 22, 12, 0, tzinfo=UTC),
     }
     return run_pipeline(_settings(), sessions, **(defaults | kwargs))  # type: ignore[arg-type]
 
