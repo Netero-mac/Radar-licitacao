@@ -39,7 +39,7 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      - uses: astral-sh/setup-uv@v10
+      - uses: astral-sh/setup-uv@v10.4.0  # o projeto não publica tag só da versão principal
         with:
           enable-cache: true
 
