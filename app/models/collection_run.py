@@ -33,3 +33,5 @@ class CollectionRun(Base):
     tenders_new: Mapped[int] = mapped_column(server_default=text("0"))
     tenders_updated: Mapped[int] = mapped_column(server_default=text("0"))
     error_message: Mapped[str | None] = mapped_column(Text)
+    # Falhas no envio dos resumos; nulo = a execução não enviou resumos.
+    notification_failures: Mapped[int | None]

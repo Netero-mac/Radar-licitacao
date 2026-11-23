@@ -7,7 +7,13 @@
 <div class="page-header">
   <h1 class="page-title">Coletas</h1>
   <form method="post" action="/admin/coletas/agora">
-    <button type="submit" class="button"{% if running %} disabled{% endif %}>Coletar agora</button>
+    <button type="submit" class="button"{% if failure_streak %}
+<p class="notice notice-error" role="alert">
+  {% if failure_streak == 1 %}A última coleta automática teve problema{% else %}As últimas {{ failure_streak }} coletas automáticas tiveram problema{% endif %}
+  (erro na coleta ou no envio dos resumos). Veja os detalhes na tabela abaixo.
+</p>
+{% endif %}
+{% if running %} disabled{% endif %}>Coletar agora</button>
   </form>
 </div>
 
@@ -51,6 +57,7 @@
         {% else %}<span class="status status-failed">Falhou</span>
           {% if run.error_message %}<div class="muted small">{{ run.error_message | truncate(160) }}</div>{% endif %}
         {% endif %}
+        {% if run.notification_failures %}<div class="small status-text-error">{{ run.notification_failures }} falha(s) no envio dos resumos</div>{% endif %}
       </td>
       <td class="small">{{ run.date_from | day_br }} a {{ run.date_to | day_br }}</td>
       <td class="small">{{ run.states | join(", ") if run.states else "Brasil" }}</td>

@@ -27,6 +27,7 @@ from app.repositories import collection_runs
 from app.scheduler import next_scheduled_runs
 from app.schemas.alerts import AlertForm
 from app.security import COOKIE_NAME, check_password, issue_token, verify_token
+from app.services import admin_alerts
 from app.services import alerts as service
 from app.services.alerts import IneffectiveKeywordError
 from app.services.locks import collection_running
@@ -433,6 +434,7 @@ def collections_page(request: Request, session: SessionDep, settings: SettingsDe
     now = datetime.now(UTC)
     context = {
         "runs": collection_runs.recent_runs(session),
+        "failure_streak": admin_alerts.current_streak(session),
         "running": collection_running(session.get_bind()),
         "next_runs": next_scheduled_runs(settings, now),
         "schedule_hours": settings.schedule_hours,

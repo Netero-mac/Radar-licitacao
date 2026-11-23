@@ -19,6 +19,7 @@ from app.models import CollectionRun, CollectionStatus, CollectionTrigger
 from app.notifiers.email import SmtpEmailSender
 from app.notifiers.telegram import TelegramClient
 from app.repositories import collection_runs
+from app.services import admin_alerts
 from app.services.alerts import match_new_tenders
 from app.services.collection import default_period, run_collection
 from app.services.locks import collection_lock
@@ -91,22 +92,30 @@ def run_pipeline(
 
             digest = None
             if send_notifications:
-                digest = _send_digests(settings, session)
+                digest = _notify(settings, session, run)
     return PipelineResult(run=run, matches=matches, digest=digest)
 
 
-def _send_digests(settings: Settings, session: Session) -> DigestReport:
-    ctx = DigestContext(
-        settings.app_base_url, ZoneInfo(settings.display_timezone), settings.smtp_from
-    )
+def _notify(settings: Settings, session: Session, run: CollectionRun) -> DigestReport:
+    """Resumos dos alertas e, nas execuções do agendador, o aviso ao administrador."""
+    email_sender = SmtpEmailSender.from_settings(settings)
     telegram = TelegramClient.from_settings(settings)
     try:
-        return send_digests(
-            session,
-            email_sender=SmtpEmailSender.from_settings(settings),
-            telegram=telegram,
-            ctx=ctx,
+        ctx = DigestContext(
+            settings.app_base_url, ZoneInfo(settings.display_timezone), settings.smtp_from
         )
+        digest = send_digests(session, email_sender=email_sender, telegram=telegram, ctx=ctx)
+        run.notification_failures = len(digest.failures)
+        session.commit()
+        admin_alerts.notify_after_cycle(
+            session,
+            run,
+            settings=settings,
+            email_sender=email_sender,
+            telegram=telegram,
+            digest_failures=digest.failures,
+        )
+        return digest
     finally:
         if telegram is not None:
             telegram.close()

@@ -51,6 +51,20 @@ def recent_runs(session: Session, limit: int = 20) -> list[CollectionRun]:
     return list(session.scalars(stmt))
 
 
+def recent_scheduled_runs(session: Session, limit: int) -> list[CollectionRun]:
+    """Execuções do agendador já terminadas, da mais recente para a mais antiga."""
+    stmt = (
+        select(CollectionRun)
+        .where(
+            CollectionRun.trigger == CollectionTrigger.SCHEDULED,
+            CollectionRun.status != CollectionStatus.RUNNING,
+        )
+        .order_by(CollectionRun.started_at.desc(), CollectionRun.id.desc())
+        .limit(limit)
+    )
+    return list(session.scalars(stmt))
+
+
 def fail_interrupted_runs(session: Session) -> int:
     """Marca como falhas as coletas que ficaram "em andamento" (processo interrompido).
 

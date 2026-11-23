@@ -130,6 +130,12 @@ trafega sem criptografia.
   novas e atualizadas), o próximo horário e o botão **"Coletar agora"**. O botão coleta os
   últimos dias e cruza com os alertas; os resumos saem no próximo horário ou pelo botão da tela
   de alertas.
+- **Aviso de falha:** se as coletas automáticas tiverem problema (erro na coleta ou no envio
+  dos resumos) `ADMIN_ALERT_AFTER_FAILURES` vezes seguidas (padrão 2, ou seja, cerca de meio
+  dia), você recebe **um** aviso em `ADMIN_ALERT_EMAIL` e/ou no chat
+  `ADMIN_ALERT_TELEGRAM_CHAT_ID`, e outro quando normalizar. Configure os dois: se o problema
+  for o próprio SMTP, o aviso por e-mail também não chega, mas o do Telegram sim. A tela
+  `/admin/coletas` também mostra um alerta enquanto houver problema.
 - **Uma coleta por vez:** agendador, botão e CLI usam a mesma trava no PostgreSQL. Uma segunda
   tentativa é ignorada, e o CLI sai com código `2`. Se o processo morrer no meio, o PostgreSQL
   solta a trava sozinho, e a coleta que ficou "em andamento" é marcada como falha na execução
@@ -411,6 +417,7 @@ erDiagram
         int tenders_new
         int tenders_updated
         text error_message
+        int notification_failures "falhas no envio dos resumos"
     }
 ```
 
@@ -433,6 +440,7 @@ Todas as variáveis estão documentadas em [`.env.example`](.env.example). As pr
 | `APP_BASE_URL` | Links dos e-mails; `https://` ativa o cookie Secure | `http://localhost:8000` |
 | `SMTP_*` | Envio de e-mail | Mailpit local |
 | `TELEGRAM_BOT_TOKEN` | Envio pelo Telegram | desativado |
+| `ADMIN_ALERT_EMAIL` / `ADMIN_ALERT_TELEGRAM_CHAT_ID` | Aviso quando as coletas falham | desativado |
 | `BACKUP_DIR` / `BACKUP_KEEP_DAYS` | Backups | `./backups` / `14` |
 
 ## Testes e qualidade
@@ -517,5 +525,9 @@ tests/            unit/ e integration/
   "Sigiloso" na lista, no detalhe e nos resumos, entra em qualquer faixa de valor dos alertas e é
   contado à parte nos totais do painel. Nos filtros de faixa de valor (lista, API e alertas),
   licitações sem valor informado ou sigilosas sempre entram, para não esconder oportunidades.
+- **Agendador parado:** o aviso de falha depende de o agendador estar rodando. Se o serviço
+  `scheduler` cair de vez (o Docker o reinicia sozinho, mas não se o servidor inteiro parar),
+  nenhuma coleta acontece e nenhum aviso sai. Para cobrir isso, use um monitor externo, como
+  UptimeRobot ou Healthchecks.io, apontado para `/health`.
 - **Categorias imperfeitas:** são uma aproximação por palavras-chave. Uma licitação pode cair em
   mais de uma ou em nenhuma.

@@ -278,6 +278,7 @@ def test_tela_de_coletas(logged: TestClient, db_session: Session) -> None:
     html = logged.get("/admin/coletas").text
 
     assert "Falhou" in html and "PNCP respondeu 500" in html
+    assert "A última coleta automática teve problema" in html
     assert "21/11/2026 a 22/11/2026" in html
     assert "Coleta automática às 7h e 18h (America/Cuiaba)" in html
     assert "Próxima:" in html
@@ -315,3 +316,23 @@ def test_coletar_agora_com_coleta_em_andamento(
     run_pipeline.assert_not_called()
     assert "Há uma coleta em andamento" in page
     assert "disabled" in page
+
+
+def test_tela_de_coletas_mostra_falha_no_envio_dos_resumos(
+    logged: TestClient, db_session: Session
+) -> None:
+    for _ in range(2):
+        run = collection_runs.start_run(
+            db_session,
+            trigger=CollectionTrigger.SCHEDULED,
+            date_from=date(2026, 11, 21),
+            date_to=date(2026, 11, 22),
+        )
+        collection_runs.finish_run(run, CollectionStatus.SUCCESS)
+        run.notification_failures = 3
+    db_session.commit()
+
+    html = logged.get("/admin/coletas").text
+
+    assert "As últimas 2 coletas automáticas tiveram problema" in html
+    assert "3 falha(s) no envio dos resumos" in html

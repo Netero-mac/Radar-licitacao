@@ -159,3 +159,23 @@ def test_falha_da_api_fica_registrada(sessions: sessionmaker[Session], db_sessio
 
     assert not result.ok
     assert result.run is not None and result.run.status == CollectionStatus.FAILED
+
+
+def test_agendador_avisa_o_administrador_depois_de_falhas_seguidas(
+    sessions: sessionmaker[Session], db_session: Session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    sender = FakeSender()
+    monkeypatch.setattr(pipeline.SmtpEmailSender, "from_settings", lambda settings: sender)
+    settings = _settings().model_copy(update={"admin_alert_email": "admin@exemplo.com.br"})
+
+    with respx.mock(base_url=BASE_URL) as router:
+        router.get(PUBLISHED_PATH).mock(return_value=httpx.Response(400, text="erro"))
+        for _ in range(2):
+            run_pipeline(
+                settings, sessions, trigger=CollectionTrigger.SCHEDULED, send_notifications=True,
+                date_from=date(2026, 11, 17), date_to=date(2026, 11, 17), client_factory=_client,
+            )  # fmt: skip
+
+    assert [m["To"] for m in sender.sent] == ["admin@exemplo.com.br"]
+    runs = collection_runs.recent_scheduled_runs(db_session, 5)
+    assert [r.notification_failures for r in runs] == [0, 0]  # sem alertas: nada a enviar

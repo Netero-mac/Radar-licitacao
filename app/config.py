@@ -76,6 +76,12 @@ class Settings(BaseSettings):
     telegram_bot_token: SecretStr | None = None
     telegram_api_url: str = "https://api.telegram.org"
 
+    # --- Aviso ao administrador quando as coletas automáticas falham ---
+    # Sem e-mail nem chat, o aviso fica desativado (a falha continua no log e em /admin/coletas).
+    admin_alert_email: str | None = None
+    admin_alert_telegram_chat_id: str | None = None
+    admin_alert_after_failures: int = Field(default=2, ge=1)
+
     @property
     def admin_enabled(self) -> bool:
         return bool(
