@@ -76,10 +76,14 @@ class TenderFilters(BaseModel):
         int | None, BlankAsDefault, Field(ge=1, description="Código da modalidade de contratação")
     ] = None
     min_value: Annotated[
-        Decimal | None, BlankAsDefault, Field(ge=0, description="Valor estimado mínimo (R$)")
+        Decimal | None,
+        BlankAsDefault,
+        Field(ge=0, description="Valor estimado mínimo (R$); sem valor ou sigilosas também entram"),
     ] = None
     max_value: Annotated[
-        Decimal | None, BlankAsDefault, Field(ge=0, description="Valor estimado máximo (R$)")
+        Decimal | None,
+        BlankAsDefault,
+        Field(ge=0, description="Valor estimado máximo (R$); sem valor ou sigilosas também entram"),
     ] = None
     published_from: Annotated[
         date | None, BlankAsDefault, Field(description="Publicadas a partir de (AAAA-MM-DD)")

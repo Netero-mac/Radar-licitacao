@@ -83,11 +83,17 @@ def test_filtra_por_faixa_de_valor(db_session: Session) -> None:
     cheap = make_tender(db_session, estimated_value=Decimal("999.99"))
     mid = make_tender(db_session, estimated_value=Decimal("50000"))
     make_tender(db_session, estimated_value=Decimal("2000000"))
-    make_tender(db_session, estimated_value=None)  # sem valor: fica fora quando há faixa
+    # sem valor ou sigilosa (zero): entram em qualquer faixa, como nos alertas
+    unknown = make_tender(db_session, estimated_value=None)
+    secret = make_tender(db_session, estimated_value=Decimal("0"))
 
-    assert sorted(_ids(db_session, max_value="50000")) == sorted([cheap.id, mid.id])
-    assert _ids(db_session, min_value="1000", max_value="50000") == [mid.id]
-    assert len(_ids(db_session)) == 4
+    assert sorted(_ids(db_session, max_value="50000")) == sorted(
+        [cheap.id, mid.id, unknown.id, secret.id]
+    )
+    assert sorted(_ids(db_session, min_value="1000", max_value="50000")) == sorted(
+        [mid.id, unknown.id, secret.id]
+    )
+    assert len(_ids(db_session)) == 5
 
 
 def test_periodo_usa_o_dia_no_horario_de_cuiaba(db_session: Session) -> None:

@@ -59,6 +59,7 @@
 
   <fieldset class="field range">
     <legend>Valor estimado (R$)</legend>
+    <small class="range-hint muted">Sem valor informado ou sigilosas também aparecem.</small>
     <input name="min_value" type="number" min="0" step="0.01" inputmode="decimal"
            value="{{ filters.min_value if filters.min_value is not none else '' }}"
            placeholder="mínimo" aria-label="Valor mínimo">

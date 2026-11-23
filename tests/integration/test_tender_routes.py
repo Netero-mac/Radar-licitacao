@@ -264,3 +264,7 @@ def test_valor_zero_aparece_como_sigiloso(client: TestClient, db_session: Sessio
     for html in (listing, detail):
         assert "Sigiloso" in html
         assert "R$ 0,00" not in html
+
+
+def test_filtro_de_valor_avisa_que_inclui_sigilosas(client: TestClient) -> None:
+    assert "Sem valor informado ou sigilosas também aparecem." in client.get("/").text

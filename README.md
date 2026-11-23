@@ -191,7 +191,7 @@ Os filtros:
 - UF (`state`);
 - município (código IBGE);
 - modalidade;
-- faixa de valor estimado;
+- faixa de valor estimado (licitações sem valor informado ou sigilosas sempre entram);
 - período de publicação;
 - "só com propostas ainda abertas", que inclui as que ainda vão abrir.
 
@@ -492,7 +492,7 @@ tests/            unit/ e integration/
 - **Valor estimado zero:** alguns órgãos publicam `R$ 0,00`, geralmente por orçamento sigiloso;
   a API não tem um campo que diga isso. O sistema trata o zero como sigiloso: aparece como
   "Sigiloso" na lista, no detalhe e nos resumos, entra em qualquer faixa de valor dos alertas e é
-  contado à parte nos totais do painel. Nos filtros de valor da lista (e da API), só entram
-  licitações com valor conhecido.
+  contado à parte nos totais do painel. Nos filtros de faixa de valor (lista, API e alertas),
+  licitações sem valor informado ou sigilosas sempre entram, para não esconder oportunidades.
 - **Categorias imperfeitas:** são uma aproximação por palavras-chave. Uma licitação pode cair em
   mais de uma ou em nenhuma.

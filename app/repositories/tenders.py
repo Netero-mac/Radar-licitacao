@@ -104,10 +104,13 @@ def filter_conditions(query: TenderQuery) -> list[ColumnElement[bool]]:
         conditions.append(Tender.municipality_ibge_code == query.municipality_ibge_code)
     if query.modality_code is not None:
         conditions.append(Tender.modality_code == query.modality_code)
+    # Como nos alertas: sem valor (nulo) ou com valor zero, que no PNCP indica orçamento
+    # sigiloso, a licitação entra em qualquer faixa, para não esconder oportunidades.
+    unknown_value = or_(Tender.estimated_value.is_(None), Tender.estimated_value == 0)
     if query.min_value is not None:
-        conditions.append(Tender.estimated_value >= query.min_value)
+        conditions.append(or_(unknown_value, Tender.estimated_value >= query.min_value))
     if query.max_value is not None:
-        conditions.append(Tender.estimated_value <= query.max_value)
+        conditions.append(or_(unknown_value, Tender.estimated_value <= query.max_value))
     if query.published_since is not None:
         conditions.append(Tender.published_at >= query.published_since)
     if query.published_before is not None:
