@@ -4,7 +4,13 @@ from zoneinfo import ZoneInfo
 
 import pytest
 
-from app.formatting import format_brl, format_cnpj, format_date, format_datetime
+from app.formatting import (
+    format_brl,
+    format_cnpj,
+    format_date,
+    format_datetime,
+    format_estimated_value,
+)
 
 CUIABA = ZoneInfo("America/Cuiaba")
 
@@ -39,3 +45,10 @@ def test_datas_sao_exibidas_no_fuso_de_cuiaba() -> None:
 def test_formata_cnpj() -> None:
     assert format_cnpj("03347135000116") == "03.347.135/0001-16"
     assert format_cnpj("123") == "123"
+
+
+def test_valor_estimado_nos_alertas() -> None:
+    assert format_estimated_value(Decimal("0")) == "Sigiloso"
+    assert format_estimated_value(Decimal("0.0000")) == "Sigiloso"
+    assert format_estimated_value(None) == "Não informado"
+    assert format_estimated_value(Decimal("1500.5")) == "R$ 1.500,50"

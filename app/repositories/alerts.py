@@ -127,18 +127,12 @@ def _match_conditions(queries: Subquery) -> list[ColumnElement[bool]]:
         Tender.state == any_(Alert.states),
         Tender.municipality_ibge_code == any_(Alert.municipalities),
     )
-    # Licitação sem valor estimado entra: é melhor avisar a mais do que perder uma.
+    # Sem valor estimado (nulo) ou com valor zero, que no PNCP indica orçamento sigiloso:
+    # a licitação entra em qualquer faixa. É melhor avisar a mais do que perder uma.
+    unknown_value = or_(Tender.estimated_value.is_(None), Tender.estimated_value == 0)
     in_value_range = and_(
-        or_(
-            Alert.min_value.is_(None),
-            Tender.estimated_value.is_(None),
-            Tender.estimated_value >= Alert.min_value,
-        ),
-        or_(
-            Alert.max_value.is_(None),
-            Tender.estimated_value.is_(None),
-            Tender.estimated_value <= Alert.max_value,
-        ),
+        or_(Alert.min_value.is_(None), unknown_value, Tender.estimated_value >= Alert.min_value),
+        or_(Alert.max_value.is_(None), unknown_value, Tender.estimated_value <= Alert.max_value),
     )
     return [Alert.active.is_(True), in_scope, in_value_range, keyword_matches]
 

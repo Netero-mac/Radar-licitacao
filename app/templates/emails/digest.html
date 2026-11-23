@@ -17,7 +17,7 @@
           <div style="font-size:12px;color:#5b6676;">{{ tender.modality_name }} · {{ tender.municipality_name }}/{{ tender.state }} · {{ tender.agency.name }}</div>
           <a href="{{ detail_url(tender.id) }}" style="display:block;margin:6px 0;font-size:15px;line-height:1.4;color:#1c2430;font-weight:bold;text-decoration:none;">{{ tender.object_description | truncate(300) }}</a>
           <div style="font-size:14px;">
-            <strong>{{ tender.estimated_value | brl }}</strong>
+            <strong>{{ tender.estimated_value | estimated_value }}</strong>
             {% if tender.proposals_close_at %}
             &nbsp;·&nbsp; Propostas até <strong>{{ tender.proposals_close_at | datetime_br }}</strong>
             {% endif %}

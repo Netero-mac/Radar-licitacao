@@ -15,7 +15,7 @@ from jinja2 import Environment
 from sqlalchemy.orm import Session
 
 from app.api.templating import get_templates, timezone_label
-from app.formatting import format_brl, format_datetime
+from app.formatting import format_datetime, format_estimated_value
 from app.models import Alert, AlertMatch
 from app.notifiers.email import EmailError, EmailSender, build_message
 from app.notifiers.telegram import TelegramClient, TelegramError, split_message
@@ -79,7 +79,7 @@ def render_telegram(alert: Alert, matches: list[AlertMatch], ctx: DigestContext)
         lines = [
             f'<a href="{link}">{esc(tender.object_description[:300])}</a>',
             f"{esc(tender.municipality_name)}/{esc(tender.state)} · {esc(tender.modality_name)}",
-            f"Valor estimado: {esc(format_brl(tender.estimated_value))}",
+            f"Valor estimado: {esc(format_estimated_value(tender.estimated_value))}",
         ]
         if tender.proposals_close_at:
             close = format_datetime(tender.proposals_close_at, ctx.tz)

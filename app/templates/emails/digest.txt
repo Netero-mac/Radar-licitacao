@@ -7,7 +7,7 @@ Prazos mais próximos primeiro. Horários seguem o {{ tz_label }}.
 {{ tender.object_description | truncate(300) }}
 {{ tender.modality_name }} · {{ tender.municipality_name }}/{{ tender.state }}
 {{ tender.agency.name }}
-Valor estimado: {{ tender.estimated_value | brl }}
+Valor estimado: {{ tender.estimated_value | estimated_value }}
 {% if tender.proposals_close_at %}Propostas até: {{ tender.proposals_close_at | datetime_br }}
 {% endif %}Detalhes: {{ detail_url(tender.id) }}
 Edital: {{ tender.source_url }}

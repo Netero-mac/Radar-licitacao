@@ -115,10 +115,10 @@ def test_sem_uf_nem_municipio_vale_para_tudo(db_session: Session) -> None:
 @pytest.mark.parametrize(
     ("min_value", "max_value", "expected"),
     [
-        (Decimal("1000"), Decimal("50000"), {"10 mil", "sem valor"}),
-        (Decimal("10000"), None, {"10 mil", "1 milhão", "sem valor"}),
-        (None, Decimal("9999.99"), {"500", "sem valor"}),
-        (None, None, {"500", "10 mil", "1 milhão", "sem valor"}),
+        (Decimal("1000"), Decimal("50000"), {"10 mil", "sem valor", "sigiloso"}),
+        (Decimal("10000"), None, {"10 mil", "1 milhão", "sem valor", "sigiloso"}),
+        (None, Decimal("9999.99"), {"500", "sem valor", "sigiloso"}),
+        (None, None, {"500", "10 mil", "1 milhão", "sem valor", "sigiloso"}),
     ],
 )
 def test_faixa_de_valor(
@@ -133,6 +133,7 @@ def test_faixa_de_valor(
         "10 mil": Decimal("10000"),
         "1 milhão": Decimal("1000000"),
         "sem valor": None,  # valor não informado entra para não perder oportunidades
+        "sigiloso": Decimal("0"),  # zero no PNCP = orçamento sigiloso: também entra
     }
     ids = {
         make_tender(db_session, estimated_value=value, object_description="Manutenção").id: label

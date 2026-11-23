@@ -275,8 +275,9 @@ sem elas, a área administrativa fica desativada. Cada alerta tem:
 - **abrangência**: UFs e/ou municípios. O município vai por nome, ex.: `Rondonópolis`; nomes que
   se repetem em outras UFs levam a sigla, como `Pedra Preta/MT`. Sem UF nem município, o alerta
   vale para tudo o que é coletado;
-- **faixa de valor** opcional. Licitações sem valor estimado também entram, para não perder
-  oportunidades;
+- **faixa de valor** opcional. Licitações sem valor estimado ou com valor **zero** também entram,
+  para não perder oportunidades. No PNCP, valor zero indica orçamento sigiloso, e o resumo mostra
+  "Sigiloso";
 - **e-mail** do resumo e, opcionalmente, um **chat do Telegram**.
 
 Como os alertas funcionam:
@@ -488,7 +489,9 @@ tests/            unit/ e integration/
   licitação alterada dias depois (prazo prorrogado, por exemplo) só é atualizada se cair de novo
   no período coletado. O PNCP tem o endpoint `/v1/contratacoes/atualizacao`, um próximo passo
   natural.
-- **Valor estimado zero:** alguns órgãos publicam `R$ 0,00` (geralmente orçamento sigiloso).
-  Hoje esse valor é tratado como zero: conta no painel e fica fora de alertas com valor mínimo.
+- **Valor estimado zero:** alguns órgãos publicam `R$ 0,00`, geralmente por orçamento sigiloso;
+  a API não tem um campo que diga isso. Nos alertas, o zero é tratado como sigiloso: entra em
+  qualquer faixa de valor e aparece como "Sigiloso". Na lista de licitações e no painel, continua
+  aparecendo como R$ 0,00.
 - **Categorias imperfeitas:** são uma aproximação por palavras-chave. Uma licitação pode cair em
   mais de uma ou em nenhuma.

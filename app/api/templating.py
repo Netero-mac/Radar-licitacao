@@ -53,6 +53,7 @@ def get_templates() -> Jinja2Templates:
     env.filters["datetime_br"] = lambda value: formatting.format_datetime(value, tz)
     env.filters["date_br"] = lambda value: formatting.format_date(value, tz)
     env.filters["cnpj"] = formatting.format_cnpj
+    env.filters["estimated_value"] = formatting.format_estimated_value
     env.filters["number"] = formatting.format_number
     env.filters["brl_compact"] = formatting.format_brl_compact
     env.filters["day_br"] = formatting.format_day

@@ -40,7 +40,7 @@
     <tr>
       <td>
         <a href="{{ path_for('tender_detail', tender_id=match.tender.id) }}">{{ match.tender.object_description | truncate(140) }}</a>
-        <div class="muted small">{{ match.tender.municipality_name }}/{{ match.tender.state }} · {{ match.tender.estimated_value | brl }}</div>
+        <div class="muted small">{{ match.tender.municipality_name }}/{{ match.tender.state }} · {{ match.tender.estimated_value | estimated_value }}</div>
       </td>
       <td class="small">{{ match.matched_at | datetime_br }}</td>
       <td class="small">{% if match.notified_at %}Enviado em {{ match.notified_at | datetime_br }}{% else %}<span class="status status-open">A enviar</span>{% endif %}</td>

@@ -5,6 +5,7 @@ from decimal import ROUND_HALF_UP, Decimal
 from zoneinfo import ZoneInfo
 
 NOT_INFORMED = "Não informado"
+SECRET_VALUE = "Sigiloso"
 
 
 def format_brl(value: Decimal | None) -> str:
@@ -59,3 +60,10 @@ def format_brl_compact(value: Decimal) -> str:
 def format_day(value: date) -> str:
     """Data de calendário (sem fuso): 01/11/2026."""
     return value.strftime("%d/%m/%Y")
+
+
+def format_estimated_value(value: Decimal | None) -> str:
+    """Valor estimado para os alertas: zero no PNCP indica orçamento sigiloso."""
+    if value is not None and value == 0:
+        return SECRET_VALUE
+    return format_brl(value)

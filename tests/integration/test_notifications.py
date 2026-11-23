@@ -74,7 +74,9 @@ def scenario(db_session: Session) -> dict[str, int]:
         estimated_value=None,
         proposals_close_at=datetime(2026, 11, 25, 13, 0, tzinfo=UTC),
     )
-    make_tender(db_session, object_description="Reforma da escola municipal")
+    make_tender(
+        db_session, object_description="Reforma da escola municipal", estimated_value=Decimal("0")
+    )
     make_alert(db_session, name="Inativo", keywords=["computador"], active=False)
     alert_service.match_new_tenders(db_session, created_since=NOW - timedelta(days=3650))
     return {"ti": ti.id, "obras": obras.id}
@@ -195,3 +197,19 @@ def test_falha_no_telegram_mantem_pendente(
     assert "bot was blocked" in report.failures[0]
     assert TOKEN not in report.failures[0]
     assert all(m.telegram_notified_at is None for m in db_session.scalars(select(AlertMatch)))
+
+
+def test_valor_zero_aparece_como_sigiloso(
+    db_session: Session, scenario: dict[str, int], telegram: TelegramClient
+) -> None:
+    sender = FakeEmailSender()
+    with respx.mock(base_url=TELEGRAM_API) as api:
+        api.post(f"/bot{TOKEN}/sendMessage").mock(
+            return_value=httpx.Response(200, json={"ok": True})
+        )
+        send_digests(db_session, email_sender=sender, telegram=telegram, ctx=CTX, now=NOW)
+
+    obras = next(m for m in sender.sent if m["To"] == "obras@empresa.com")
+    assert "Sigiloso" in _html(obras)
+    assert "Valor estimado: Sigiloso" in _text(obras)
+    assert "R$ 0,00" not in _html(obras)
