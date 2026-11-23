@@ -1,14 +1,17 @@
-"""Gravação de órgãos e contratações com upsert (INSERT ... ON CONFLICT do PostgreSQL)."""
+"""Acesso às contratações: gravação com upsert (INSERT ... ON CONFLICT) e consultas."""
 
 from collections.abc import Sequence
 from dataclasses import dataclass
+from datetime import datetime
+from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import func, literal_column, select
+from sqlalchemy import ColumnElement, func, literal_column, or_, select
 from sqlalchemy.dialects.postgresql import insert
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from app.models import Agency, Tender
+from app.models.tender import SEARCH_CONFIG
 
 
 @dataclass(frozen=True, slots=True)
@@ -68,3 +71,80 @@ def upsert_tenders(session: Session, rows: Sequence[dict[str, Any]]) -> UpsertRe
     inserted_flags = session.execute(stmt).scalars().all()
     new = sum(1 for inserted in inserted_flags if inserted)
     return UpsertResult(new=new, updated=len(inserted_flags) - new)
+
+
+# --- Consulta ---------------------------------------------------------------------------
+
+
+@dataclass(frozen=True, slots=True)
+class TenderQuery:
+    """Critérios já resolvidos (datas convertidas para instantes UTC)."""
+
+    text: str | None = None
+    municipality_ibge_code: str | None = None
+    modality_code: int | None = None
+    min_value: Decimal | None = None
+    max_value: Decimal | None = None
+    published_since: datetime | None = None
+    published_before: datetime | None = None
+    open_at: datetime | None = None  # prazo de propostas ainda não encerrado neste instante
+
+
+_SEARCH_REGCONFIG = literal_column(f"'{SEARCH_CONFIG}'::regconfig")
+
+
+def _conditions(query: TenderQuery) -> list[ColumnElement[bool]]:
+    conditions: list[ColumnElement[bool]] = []
+    if query.text:
+        # websearch_to_tsquery aceita "frase exata", OR e -palavra, sem erro de sintaxe.
+        tsquery = func.websearch_to_tsquery(_SEARCH_REGCONFIG, query.text)
+        # Busca só com palavras vazias ("de", "para") vira consulta vazia: não filtra.
+        conditions.append(or_(func.numnode(tsquery) == 0, Tender.search_vector.op("@@")(tsquery)))
+    if query.municipality_ibge_code:
+        conditions.append(Tender.municipality_ibge_code == query.municipality_ibge_code)
+    if query.modality_code is not None:
+        conditions.append(Tender.modality_code == query.modality_code)
+    if query.min_value is not None:
+        conditions.append(Tender.estimated_value >= query.min_value)
+    if query.max_value is not None:
+        conditions.append(Tender.estimated_value <= query.max_value)
+    if query.published_since is not None:
+        conditions.append(Tender.published_at >= query.published_since)
+    if query.published_before is not None:
+        conditions.append(Tender.published_at < query.published_before)
+    if query.open_at is not None:
+        # Inclui as que ainda vão abrir: também dá tempo de preparar a proposta.
+        conditions.append(Tender.proposals_close_at > query.open_at)
+    return conditions
+
+
+def search_tenders(
+    session: Session, query: TenderQuery, *, limit: int, offset: int
+) -> tuple[list[Tender], int]:
+    """Página de licitações (mais recentes primeiro) e o total que atende aos critérios."""
+    conditions = _conditions(query)
+    total = session.scalar(select(func.count()).select_from(Tender).where(*conditions)) or 0
+    stmt = (
+        select(Tender)
+        .options(joinedload(Tender.agency))
+        .where(*conditions)
+        .order_by(Tender.published_at.desc(), Tender.id.desc())
+        .limit(limit)
+        .offset(offset)
+    )
+    return list(session.scalars(stmt)), total
+
+
+def get_tender(session: Session, tender_id: int) -> Tender | None:
+    stmt = select(Tender).options(joinedload(Tender.agency)).where(Tender.id == tender_id)
+    return session.scalars(stmt).one_or_none()
+
+
+def list_municipalities(session: Session) -> list[tuple[str, str]]:
+    """(código IBGE, nome) dos municípios que têm licitações, em ordem alfabética."""
+    stmt = (
+        select(Tender.municipality_ibge_code, func.min(Tender.municipality_name).label("name"))
+        .group_by(Tender.municipality_ibge_code)
+        .order_by("name")
+    )
+    return [(code, name) for code, name in session.execute(stmt)]

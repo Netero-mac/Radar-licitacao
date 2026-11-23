@@ -1,0 +1,181 @@
+/* Radar de Licitações MT: CSS simples, sem framework. */
+
+:root {
+  --bg: #f6f7f9;
+  --surface: #ffffff;
+  --text: #1c2430;
+  --muted: #5b6676;
+  --border: #dfe3e8;
+  --accent: #0b6e4f;
+  --accent-strong: #08573f;
+  --accent-soft: #e3f3ec;
+  --warning-bg: #fff4d6;
+  --warning-text: #6b4e00;
+  --closed-bg: #eef0f3;
+  --radius: 10px;
+  --shadow: 0 1px 2px rgb(16 24 40 / 6%);
+  color-scheme: light;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #12161c;
+    --surface: #1a2028;
+    --text: #e6e9ee;
+    --muted: #9aa5b4;
+    --border: #2c3440;
+    --accent: #3ccf97;
+    --accent-strong: #66dcae;
+    --accent-soft: #163a2e;
+    --warning-bg: #3a2f10;
+    --warning-text: #f3d78a;
+    --closed-bg: #252c36;
+    color-scheme: dark;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  background: var(--bg);
+  color: var(--text);
+  font: 16px/1.5 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+}
+
+a { color: var(--accent); }
+a:hover { color: var(--accent-strong); }
+code { font-size: 0.9em; }
+
+.container { max-width: 1040px; margin: 0 auto; padding: 0 16px; }
+
+/* Cabeçalho e rodapé */
+.site-header { background: var(--surface); border-bottom: 1px solid var(--border); }
+.header-inner { display: flex; align-items: center; justify-content: space-between; gap: 16px; min-height: 56px; flex-wrap: wrap; }
+.brand { color: var(--text); text-decoration: none; font-size: 1.05rem; }
+.brand-mark { color: var(--accent); }
+.site-header nav { display: flex; gap: 20px; }
+.site-header nav a { text-decoration: none; color: var(--muted); }
+.site-header nav a:hover { color: var(--text); }
+.site-footer { color: var(--muted); font-size: 0.85rem; padding: 32px 0; }
+
+.page-title { font-size: 1.6rem; margin: 28px 0 16px; line-height: 1.25; }
+.muted { color: var(--muted); }
+
+/* Filtros */
+.filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 14px 16px;
+  align-items: end;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 16px;
+  box-shadow: var(--shadow);
+}
+.field { display: flex; flex-direction: column; gap: 4px; min-width: 0; margin: 0; padding: 0; border: 0; }
+.field-search { grid-column: 1 / -1; }
+.field label, .field legend { font-size: 0.85rem; color: var(--muted); padding: 0; }
+.range { flex-direction: row; flex-wrap: wrap; align-items: center; gap: 6px; }
+.range legend { width: 100%; margin-bottom: 4px; }
+.range input { flex: 1 1 0; min-width: 0; }
+
+input, select, button, .button, .button-secondary { font: inherit; }
+input, select {
+  width: 100%;
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg);
+  color: var(--text);
+}
+input:focus-visible, select:focus-visible, a:focus-visible, button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+.checkbox { display: flex; gap: 8px; align-items: center; padding-bottom: 8px; }
+.checkbox input { width: auto; }
+.actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+
+button, .button {
+  background: var(--accent);
+  color: #fff;
+  border: 0;
+  border-radius: 8px;
+  padding: 9px 16px;
+  cursor: pointer;
+  text-decoration: none;
+  display: inline-block;
+}
+button:hover, .button:hover { background: var(--accent-strong); color: #fff; }
+.button-secondary {
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 14px;
+  text-decoration: none;
+  color: var(--text);
+  background: var(--surface);
+}
+
+@media (prefers-color-scheme: dark) {
+  button, .button, button:hover, .button:hover { color: #0b1a14; }
+}
+
+/* Resultados */
+#results { margin-top: 20px; transition: opacity 0.15s; }
+#results.htmx-request { opacity: 0.5; }
+.result-count { color: var(--muted); margin: 0 0 12px; }
+.notice { padding: 10px 14px; border-radius: 8px; margin: 0 0 12px; }
+.notice-warning { background: var(--warning-bg); color: var(--warning-text); }
+
+.tender-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.tender-card {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 14px 16px;
+  box-shadow: var(--shadow);
+}
+.tender-meta { display: flex; flex-wrap: wrap; gap: 6px 14px; font-size: 0.85rem; color: var(--muted); align-items: center; }
+.tag { background: var(--accent-soft); color: var(--accent-strong); border-radius: 999px; padding: 1px 10px; font-weight: 600; }
+.tender-title { font-size: 1.02rem; margin: 8px 0 4px; line-height: 1.4; overflow-wrap: anywhere; }
+.tender-title a { color: var(--text); text-decoration: none; }
+.tender-title a:hover { color: var(--accent); text-decoration: underline; }
+.tender-agency { margin: 0; color: var(--muted); font-size: 0.9rem; }
+.tender-footer { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 8px; margin-top: 10px; align-items: center; }
+.value { font-weight: 700; font-variant-numeric: tabular-nums; }
+.status { font-size: 0.85rem; border-radius: 6px; padding: 2px 8px; }
+.status-open { background: var(--accent-soft); color: var(--accent-strong); }
+.status-closed { background: var(--closed-bg); color: var(--muted); }
+
+.pagination { display: flex; justify-content: center; align-items: center; gap: 20px; margin: 24px 0; color: var(--muted); }
+
+/* Detalhe */
+.breadcrumb { margin: 20px 0 0; }
+.detail {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 20px;
+  margin-top: 12px;
+  box-shadow: var(--shadow);
+}
+.detail-title { font-size: 1.3rem; line-height: 1.4; margin: 10px 0 16px; overflow-wrap: anywhere; }
+.detail-highlight { display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 16px; padding: 14px 0; border-block: 1px solid var(--border); }
+.detail-highlight > div { display: flex; flex-direction: column; gap: 4px; align-items: flex-start; }
+.detail-highlight .value { font-size: 1.3rem; }
+.label { font-size: 0.85rem; color: var(--muted); }
+.detail .actions { margin: 18px 0; }
+.detail-grid { display: grid; grid-template-columns: minmax(140px, 220px) 1fr; gap: 8px 16px; margin: 0; }
+.detail-grid dt { color: var(--muted); }
+.detail-grid dd { margin: 0; overflow-wrap: anywhere; }
+.section-title { font-size: 1.05rem; margin: 24px 0 8px; }
+.prewrap { white-space: pre-line; }
+.empty-state { text-align: center; padding: 40px 0; }
+
+@media (max-width: 560px) {
+  .detail-grid { grid-template-columns: 1fr; gap: 2px; }
+  .detail-grid dd { margin-bottom: 10px; }
+  .page-title { font-size: 1.35rem; }
+}

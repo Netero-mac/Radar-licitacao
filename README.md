@@ -30,6 +30,32 @@ uv run alembic upgrade head      # aplica as migrations
 uv run uvicorn app.main:app --reload
 ```
 
+## Telas e API
+
+| Endereço | O que é |
+|---|---|
+| `/` | Licitações mais recentes, com busca e filtros |
+| `/licitacoes/{id}` | Detalhe da licitação, com link para o edital no PNCP |
+| `/api/tenders` | Mesma listagem em JSON, com os mesmos filtros |
+| `/api/tenders/{id}` | Detalhe em JSON |
+| `/api/municipalities`, `/api/modalities` | Valores aceitos nos filtros |
+| `/docs` | Documentação interativa da API |
+
+**Filtros:** busca no objeto (`q`), município (código IBGE), modalidade, faixa de valor estimado,
+período de publicação e "só com propostas ainda abertas" (inclui as que ainda vão abrir).
+
+**Busca textual:** usa o full-text search do PostgreSQL com dicionário `portuguese` + `unaccent`.
+Por isso `manutencao` encontra "MANUTENÇÃO" e `computador` encontra "computadores". Aceita
+`"frase exata"`, `or` e `-palavra` para excluir.
+
+```bash
+curl "http://localhost:8000/api/tenders?q=manutencao&municipality=5107602&open_only=true"
+```
+
+Datas dos filtros são dias no fuso de Cuiabá; na API, datas saem em UTC (ISO 8601) e valores
+como texto decimal (`"3500000.0000"`) para não perder precisão. As telas funcionam sem
+JavaScript; com ele, o HTMX atualiza só a lista ao mudar um filtro.
+
 ## Coleta do PNCP
 
 A coleta usa a [API pública de consulta do PNCP](https://pncp.gov.br/api/consulta/swagger-ui/index.html)

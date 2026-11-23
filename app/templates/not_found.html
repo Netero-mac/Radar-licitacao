@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block title %}Não encontrado · Radar de Licitações MT{% endblock %}
+
+{% block content %}
+<div class="empty-state">
+  <h1 class="page-title">{{ message }}</h1>
+  <p>Ela pode ter sido removida ou o endereço está incorreto.</p>
+  <p><a class="button" href="{{ path_for('tender_list') }}">Ir para a lista de licitações</a></p>
+</div>
+{% endblock %}

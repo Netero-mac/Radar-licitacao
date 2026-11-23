@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Radar de Licitações MT{% endblock %}</title>
+  <link rel="stylesheet" href="{{ path_for('static', path='css/style.css') }}">
+  <script src="{{ path_for('static', path='vendor/htmx.min.js') }}" defer></script>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container header-inner">
+      <a class="brand" href="{{ path_for('tender_list') }}">
+        <span class="brand-mark" aria-hidden="true">◎</span> Radar de Licitações <strong>MT</strong>
+      </a>
+      <nav aria-label="Principal">
+        <a href="{{ path_for('tender_list') }}">Licitações</a>
+        <a href="/docs">API</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="container">
+    {% block content %}{% endblock %}
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      Dados do <a href="https://pncp.gov.br" rel="noopener">Portal Nacional de Contratações Públicas (PNCP)</a>.
+      Horários no fuso de Cuiabá. Confira sempre o edital original antes de participar.
+    </div>
+  </footer>
+</body>
+</html>

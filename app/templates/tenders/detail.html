@@ -1,0 +1,78 @@
+{% extends "base.html" %}
+
+{% block title %}{{ tender.object_description | truncate(70) }} · Radar de Licitações MT{% endblock %}
+
+{% block content %}
+<p class="breadcrumb"><a href="{{ path_for('tender_list') }}">← Voltar para a lista</a></p>
+
+<article class="detail">
+  <div class="tender-meta">
+    <span class="tag">{{ tender.modality_name }}</span>
+    <span>{{ tender.status }}</span>
+  </div>
+  <h1 class="detail-title">{{ tender.object_description }}</h1>
+
+  <div class="detail-highlight">
+    <div>
+      <span class="label">Valor estimado</span>
+      <span class="value">{{ tender.estimated_value | brl }}</span>
+    </div>
+    <div>
+      <span class="label">Recebimento de propostas</span>
+      {% if tender.proposals_close_at %}
+        <span>{{ tender.proposals_open_at | datetime_br }} até {{ tender.proposals_close_at | datetime_br }}</span>
+        {% if tender.proposals_open %}
+          <span class="status status-open">Aberto</span>
+        {% else %}
+          <span class="status status-closed">Encerrado</span>
+        {% endif %}
+      {% else %}
+        <span>Não informado</span>
+      {% endif %}
+    </div>
+  </div>
+
+  <p class="actions">
+    <a class="button" href="{{ tender.source_url }}" target="_blank" rel="noopener">Ver edital no PNCP ↗</a>
+    {% if tender.origin_system_url %}
+    <a class="button-secondary" href="{{ tender.origin_system_url }}" target="_blank" rel="noopener noreferrer">Sistema de compras do órgão ↗</a>
+    {% endif %}
+  </p>
+
+  <dl class="detail-grid">
+    <dt>Órgão</dt>
+    <dd>{{ tender.agency.name }} <span class="muted">(CNPJ {{ tender.agency.cnpj | cnpj }})</span></dd>
+    {% if tender.unit_name %}
+    <dt>Unidade</dt>
+    <dd>{{ tender.unit_name }}</dd>
+    {% endif %}
+    <dt>Município</dt>
+    <dd>{{ tender.municipality_name }}/{{ tender.state }}</dd>
+    <dt>Publicada no PNCP</dt>
+    <dd>{{ tender.published_at | datetime_br }}</dd>
+    {% if tender.process_number %}
+    <dt>Processo</dt>
+    <dd>{{ tender.process_number }}</dd>
+    {% endif %}
+    {% if tender.dispute_mode %}
+    <dt>Modo de disputa</dt>
+    <dd>{{ tender.dispute_mode }}</dd>
+    {% endif %}
+    {% if tender.legal_basis %}
+    <dt>Amparo legal</dt>
+    <dd>{{ tender.legal_basis }}</dd>
+    {% endif %}
+    <dt>Nº de controle PNCP</dt>
+    <dd><code>{{ tender.pncp_control_number }}</code></dd>
+    <dt>Última atualização no PNCP</dt>
+    <dd>{{ tender.pncp_updated_at | datetime_br }}</dd>
+  </dl>
+
+  {% if tender.complementary_info %}
+  <section>
+    <h2 class="section-title">Informação complementar</h2>
+    <p class="prewrap">{{ tender.complementary_info }}</p>
+  </section>
+  {% endif %}
+</article>
+{% endblock %}

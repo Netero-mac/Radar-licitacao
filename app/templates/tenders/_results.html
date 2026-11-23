@@ -1,0 +1,52 @@
+{#- Bloco de resultados: incluído na página inteira e devolvido sozinho nas requisições HTMX. -#}
+{% for error in errors %}
+<p class="notice notice-warning">{{ error }} (filtro ignorado)</p>
+{% endfor %}
+
+<p class="result-count">
+  {% if result.total == 0 %}
+    Nenhuma licitação encontrada{% if filters.is_filtered %} com esses filtros{% endif %}.
+  {% elif result.total == 1 %}
+    1 licitação encontrada
+  {% else %}
+    {{ "{:,}".format(result.total).replace(",", ".") }} licitações encontradas
+  {% endif %}
+</p>
+
+<ol class="tender-list">
+  {% for tender in result.items %}
+  <li class="tender-card">
+    <div class="tender-meta">
+      <span class="tag">{{ tender.modality_name }}</span>
+      <span>{{ tender.municipality_name }}</span>
+      <span>Publicada em {{ tender.published_at | date_br }}</span>
+    </div>
+    <h2 class="tender-title">
+      <a href="{{ path_for('tender_detail', tender_id=tender.id) }}">{{ tender.object_description | truncate(220) }}</a>
+    </h2>
+    <p class="tender-agency">{{ tender.agency_name }}</p>
+    <div class="tender-footer">
+      <span class="value">{{ tender.estimated_value | brl }}</span>
+      {% if tender.proposals_open %}
+        <span class="status status-open">Propostas até {{ tender.proposals_close_at | datetime_br }}</span>
+      {% elif tender.proposals_close_at %}
+        <span class="status status-closed">Propostas encerradas em {{ tender.proposals_close_at | date_br }}</span>
+      {% endif %}
+    </div>
+  </li>
+  {% endfor %}
+</ol>
+
+{% if result.pages > 1 %}
+<nav class="pagination" aria-label="Paginação">
+  {% if result.page > 1 %}
+    {% set url = page_url(result.page - 1) %}
+    <a href="{{ url }}" hx-get="{{ url }}" hx-target="#results" hx-push-url="true" rel="prev">← Anterior</a>
+  {% endif %}
+  <span>Página {{ result.page }} de {{ result.pages }}</span>
+  {% if result.page < result.pages %}
+    {% set url = page_url(result.page + 1) %}
+    <a href="{{ url }}" hx-get="{{ url }}" hx-target="#results" hx-push-url="true" rel="next">Próxima →</a>
+  {% endif %}
+</nav>
+{% endif %}
