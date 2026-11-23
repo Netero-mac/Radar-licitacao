@@ -6,6 +6,8 @@ class Sphere(StrEnum):
     STATE = "estadual"
     FEDERAL = "federal"
     DISTRICT = "distrital"
+    # esferaId "N" no PNCP: consórcios, serviços sociais e outras entidades sem esfera.
+    NOT_APPLICABLE = "nao_se_aplica"
 
 
 class CollectionStatus(StrEnum):

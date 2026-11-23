@@ -30,6 +30,35 @@ uv run alembic upgrade head      # aplica as migrations
 uv run uvicorn app.main:app --reload
 ```
 
+## Coleta do PNCP
+
+A coleta usa a [API pública de consulta do PNCP](https://pncp.gov.br/api/consulta/swagger-ui/index.html)
+(endpoint `/v1/contratacoes/publicacao`), filtrando pela UF de `PNCP_STATE`. Como a API exige
+uma modalidade por consulta, cada execução percorre as modalidades de `PNCP_MODALITIES`, página
+a página.
+
+```bash
+uv run python -m app.collect                                    # últimos 2 dias (padrão)
+uv run python -m app.collect --from 2026-11-01 --to 2026-11-22  # período específico
+uv run python -m app.collect --modalidades 6,8                  # só pregão eletrônico e dispensa
+docker compose exec app python -m app.collect                   # dentro do Docker
+```
+
+- **Sem duplicatas:** cada contratação é gravada pelo número de controle do PNCP (upsert).
+  Coletar o mesmo período de novo só atualiza o que mudou na API.
+- **Resiliente:** novas tentativas com backoff exponencial em erro 5xx, timeout, falha de rede e
+  `429` (limite de requisições, que o PNCP aplica de fato). O cabeçalho `Retry-After` é
+  respeitado quando vem na resposta.
+- **Rastreável:** toda execução fica em `collection_runs`, com páginas lidas, novas, atualizadas
+  e a mensagem de erro, se houver. Cada página é salva assim que chega, então uma falha no meio
+  não perde o que já foi coletado. O comando sai com código `1` se a coleta falhar.
+- **Datas:** a API informa horários de Brasília sem fuso (`PNCP_TIMEZONE`); no banco tudo é UTC.
+
+Códigos de modalidade: 1 Leilão eletrônico, 2 Diálogo competitivo, 3 Concurso,
+4 Concorrência eletrônica, 5 Concorrência presencial, 6 Pregão eletrônico, 7 Pregão presencial,
+8 Dispensa, 9 Inexigibilidade, 10 Manifestação de interesse, 11 Pré-qualificação,
+12 Credenciamento, 13 Leilão presencial.
+
 ## Testes e qualidade
 
 ```bash

@@ -5,6 +5,7 @@ import pytest
 from alembic import command
 from alembic.config import Config
 from sqlalchemy import Engine, create_engine, text
+from sqlalchemy.orm import Session
 
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL")
 
@@ -36,3 +37,17 @@ def migrated_engine() -> Iterator[Engine]:
     command.upgrade(alembic_config(TEST_DATABASE_URL), "head")
     yield engine
     engine.dispose()
+
+
+@pytest.fixture
+def db_session(migrated_engine: Engine) -> Iterator[Session]:
+    """Sessão num banco com as tabelas vazias (cada teste começa do zero)."""
+    with migrated_engine.begin() as conn:
+        conn.execute(
+            text(
+                "TRUNCATE alert_matches, alerts, tenders, agencies, collection_runs "
+                "RESTART IDENTITY CASCADE"
+            )
+        )
+    with Session(migrated_engine, expire_on_commit=False) as session:
+        yield session
