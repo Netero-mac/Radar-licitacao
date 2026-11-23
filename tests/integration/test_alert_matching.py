@@ -262,3 +262,39 @@ def test_estatisticas_e_exclusao(db_session: Session) -> None:
     assert service.list_alerts(db_session) == []
     assert db_session.scalars(select(AlertMatch)).all() == []
     assert db_session.scalars(select(Tender)).all() != []  # licitações não são apagadas
+
+
+# --- Singular e plural -----------------------------------------------------------------
+
+
+@pytest.mark.parametrize(
+    ("keyword", "text"),
+    [
+        ("obra", "Execução das OBRAS de pavimentação"),
+        ("obras", "Fiscalização de obra pública"),
+        ("pneu", "Aquisição de pneus para a frota"),
+        ("construção", "Construções de unidades habitacionais"),
+        ("móveis", "Aquisição de móvel planejado"),
+        ("manutenção de caminhão", "Manutenções preventivas de caminhões"),
+    ],
+)
+def test_palavra_chave_acha_singular_e_plural(db_session: Session, keyword: str, text: str) -> None:
+    alert = make_alert(db_session, keywords=[keyword])
+    hit = make_tender(db_session, object_description=text)
+
+    _match_all(db_session)
+
+    assert _matched(db_session, alert) == {hit.id}
+
+
+def test_exclusao_e_precedencia_com_plural(db_session: Session) -> None:
+    # "pneu caminhão OR ônibus" = pneu E (caminhão OU ônibus), sem os de bicicleta
+    alert = make_alert(db_session, keywords=["pneu caminhão OR ônibus -bicicleta"])
+    truck = make_tender(db_session, object_description="Pneus para caminhões")
+    bus = make_tender(db_session, object_description="Pneu para ônibus escolar")
+    make_tender(db_session, object_description="Pneus para caminhões e bicicletas")
+    make_tender(db_session, object_description="Peças para caminhões")
+
+    _match_all(db_session)
+
+    assert _matched(db_session, alert) == {truck.id, bus.id}

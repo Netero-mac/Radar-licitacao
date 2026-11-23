@@ -7,25 +7,23 @@ from enum import StrEnum
 
 from sqlalchemy import (
     ColumnElement,
-    String,
+    Subquery,
     and_,
     any_,
-    cast,
     delete,
     exists,
     func,
-    literal_column,
+    literal,
     or_,
     select,
+    union_all,
     update,
 )
-from sqlalchemy.dialects.postgresql import ARRAY, array, insert
+from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import InstrumentedAttribute, Session, joinedload
 
 from app.models import Alert, AlertMatch, Tender
-from app.models.tender import SEARCH_CONFIG
-
-_REGCONFIG = literal_column(f"'{SEARCH_CONFIG}'::regconfig")
+from app.search_query import build_tsquery
 
 
 class Channel(StrEnum):
@@ -89,34 +87,39 @@ def recent_matches(session: Session, alert_id: int, limit: int = 50) -> list[Ale
 
 def ineffective_keywords(session: Session, keywords: Sequence[str]) -> list[str]:
     """Palavras-chave que viram busca vazia (só palavras como "de", "para")."""
-    if not keywords:
-        return []
-    keyword = func.unnest(literal_list(keywords)).alias("kw")
-    stmt = (
-        select(literal_column("kw"))
-        .select_from(keyword)
-        .where(func.numnode(func.websearch_to_tsquery(_REGCONFIG, literal_column("kw"))) == 0)
-    )
-    return list(session.scalars(stmt))
-
-
-def literal_list(values: Sequence[str]) -> ColumnElement[list[str]]:
-    return cast(array(list(values)), ARRAY(String))
+    return [
+        keyword
+        for keyword in keywords
+        if session.scalar(select(func.numnode(build_tsquery(keyword)))) == 0
+    ]
 
 
 # --- Cruzamento ------------------------------------------------------------------------
 
 
-def _match_conditions() -> list[ColumnElement[bool]]:
+def _keyword_queries(session: Session, alert_id: int | None) -> Subquery | None:
+    """(alert_id, tsquery) de cada palavra-chave dos alertas ativos.
+
+    A tsquery é montada em Python (singular/plural, ver app.search_query) e vai para o
+    banco como uma tabela derivada (UNION ALL), mantendo o cruzamento num único comando.
+    """
+    stmt = select(Alert.id, Alert.keywords).where(Alert.active.is_(True))
+    if alert_id is not None:
+        stmt = stmt.where(Alert.id == alert_id)
+    rows = [
+        select(literal(id_).label("alert_id"), build_tsquery(keyword).label("query"))
+        for id_, keywords in session.execute(stmt)
+        for keyword in keywords
+    ]
+    return union_all(*rows).subquery("keyword_queries") if rows else None
+
+
+def _match_conditions(queries: Subquery) -> list[ColumnElement[bool]]:
     """Regras de um alerta valer para uma licitação (Alert x Tender)."""
-    keyword = func.unnest(Alert.keywords).alias("kw")
     keyword_matches = exists(
-        select(1)
-        .select_from(keyword)
-        .where(
-            Tender.search_vector.op("@@")(
-                func.websearch_to_tsquery(_REGCONFIG, literal_column("kw"))
-            )
+        select(1).where(
+            queries.c.alert_id == Alert.id,
+            Tender.search_vector.op("@@", is_comparison=True)(queries.c.query),
         )
     )
     in_scope = or_(
@@ -152,7 +155,10 @@ def create_matches(
     Pares já existentes são ignorados (ON CONFLICT DO NOTHING): rodar de novo não duplica
     nem "desnotifica" nada. Devolve quantos casamentos novos foram criados.
     """
-    conditions = _match_conditions()
+    queries = _keyword_queries(session, alert_id)
+    if queries is None:  # nenhum alerta ativo
+        return 0
+    conditions = _match_conditions(queries)
     if tenders_created_since is not None:
         conditions.append(Tender.created_at >= tenders_created_since)
     if proposals_open_at is not None:

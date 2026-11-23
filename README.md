@@ -127,7 +127,8 @@ Cadastre os alertas em **`/admin/alertas`** (senha `ADMIN_PASSWORD`; também é 
 `SECRET_KEY`). Cada alerta tem:
 
 - **palavras-chave**, uma por linha. Basta uma casar. A busca é a mesma da tela: ignora acentos e
-  plural, aceita `"frase exata"` e `-palavra` para excluir;
+  maiúsculas, acha singular e plural ("obra" encontra "obras", "pneu" encontra "pneus"),
+  aceita `"frase exata"` e `-palavra` para excluir;
 - **abrangência**: UFs e/ou municípios (por nome, ex.: `Rondonópolis`; nomes repetidos em
   outras UFs como `Pedra Preta/MT`). Sem nenhum dos dois, vale para tudo o que é coletado;
 - **faixa de valor** opcional. Licitações sem valor estimado também entram, para não perder

@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 
 from app.categories import Category
 from app.models import Tender
-from app.repositories.tenders import SEARCH_REGCONFIG
+from app.search_query import SEARCH_REGCONFIG
 
 Conditions = Sequence[ColumnElement[bool]]
 

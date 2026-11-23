@@ -11,7 +11,7 @@ from sqlalchemy.dialects.postgresql import insert
 from sqlalchemy.orm import Session, joinedload
 
 from app.models import Agency, Tender
-from app.models.tender import SEARCH_CONFIG
+from app.search_query import build_tsquery
 
 
 @dataclass(frozen=True, slots=True)
@@ -91,14 +91,11 @@ class TenderQuery:
     open_at: datetime | None = None  # prazo de propostas ainda não encerrado neste instante
 
 
-SEARCH_REGCONFIG = literal_column(f"'{SEARCH_CONFIG}'::regconfig")
-
-
 def filter_conditions(query: TenderQuery) -> list[ColumnElement[bool]]:
     conditions: list[ColumnElement[bool]] = []
     if query.text:
-        # websearch_to_tsquery aceita "frase exata", OR e -palavra, sem erro de sintaxe.
-        tsquery = func.websearch_to_tsquery(SEARCH_REGCONFIG, query.text)
+        # Sintaxe do websearch ("frase exata", OR, -palavra), achando também o plural.
+        tsquery = build_tsquery(query.text)
         # Busca só com palavras vazias ("de", "para") vira consulta vazia: não filtra.
         conditions.append(or_(func.numnode(tsquery) == 0, Tender.search_vector.op("@@")(tsquery)))
     if query.state:

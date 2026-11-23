@@ -146,3 +146,13 @@ def test_filtra_por_uf(db_session: Session) -> None:
     assert _ids(db_session, state="MT") == [mt.id]
     assert service.states(db_session) == ["MT", "SP"]
     assert service.municipalities(db_session, "SP") == [("3550308", "São Paulo")]
+
+
+def test_busca_acha_o_plural_que_o_stemmer_nao_junta(db_session: Session) -> None:
+    obras = make_tender(db_session, object_description="Execução de OBRAS de drenagem")
+    pneus = make_tender(db_session, object_description="Aquisição de pneus")
+    db_session.commit()
+
+    assert _ids(db_session, q="obra") == [obras.id]
+    assert _ids(db_session, q="pneu") == [pneus.id]
+    assert _ids(db_session, q="obra -drenagem") == []

@@ -8,10 +8,11 @@ computadores" conta nas duas — e as que não casam com nenhuma ficam em "Sem c
 Para ajustar, edite as palavras-chave abaixo; a sintaxe é a do campo de busca
 (``OR`` entre termos, ``"frase exata"``).
 
-O stemmer de português do PostgreSQL não junta todos os plurais ("obra" e "obras",
-"pneu" e "pneus", "construção" e "construções" viram termos diferentes), por isso as
-duas formas aparecem quando necessário. "obra" fica de fora de propósito: casaria com
-"mão de obra" (terceirização de serviços), que não é obra.
+Diferente da busca e dos alertas (app.search_query), aqui não há expansão automática
+de singular/plural: a lista é exatamente o que está escrito, e as duas formas aparecem
+quando o stemmer de português não as junta ("pneu"/"pneus", "construção"/"construções").
+"obra" fica de fora de propósito: casaria com "mão de obra" (terceirização de
+serviços), que não é obra.
 """
 
 from dataclasses import dataclass
