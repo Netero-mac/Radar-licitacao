@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+
+{% block title %}{{ alert.name }} · Alertas · Radar de Licitações{% endblock %}
+
+{% block content %}
+{% include "admin/_nav.html" %}
+<p class="breadcrumb"><a href="/admin/alertas">← Alertas</a></p>
+<div class="page-header">
+  <h1 class="page-title">{{ alert.name }}</h1>
+  <a class="button-secondary" href="/admin/alertas/{{ alert.id }}/editar">Editar</a>
+</div>
+
+<dl class="detail-grid card">
+  <dt>Situação</dt><dd>{{ "Ativo" if alert.active else "Inativo" }}</dd>
+  <dt>E-mail</dt><dd>{{ alert.email }}</dd>
+  <dt>Palavras-chave</dt><dd>{{ alert.keywords | join(", ") }}</dd>
+  <dt>Abrangência</dt>
+  <dd>
+    {% if not alert.states and not alert.municipalities %}Tudo o que é coletado{% endif %}
+    {% if alert.states %}UFs: {{ alert.states | join(", ") }}{% endif %}
+    {% if alert.municipalities %}{% if alert.states %}<br>{% endif %}Municípios: {% for code in alert.municipalities %}{{ municipality_label(code) }}{% if not loop.last %}, {% endif %}{% endfor %}{% endif %}
+  </dd>
+  {% if alert.telegram_chat_id %}<dt>Telegram</dt><dd><code>{{ alert.telegram_chat_id }}</code></dd>{% endif %}
+</dl>
+
+<h2 class="section-title">Últimas licitações encontradas</h2>
+{% if matches %}
+<div class="table-wrap">
+<table class="table">
+  <thead>
+    <tr>
+      <th scope="col">Licitação</th>
+      <th scope="col">Encontrada em</th>
+      <th scope="col">E-mail</th>
+      {% if alert.telegram_chat_id %}<th scope="col">Telegram</th>{% endif %}
+    </tr>
+  </thead>
+  <tbody>
+    {% for match in matches %}
+    <tr>
+      <td>
+        <a href="{{ path_for('tender_detail', tender_id=match.tender.id) }}">{{ match.tender.object_description | truncate(140) }}</a>
+        <div class="muted small">{{ match.tender.municipality_name }}/{{ match.tender.state }} · {{ match.tender.estimated_value | brl }}</div>
+      </td>
+      <td class="small">{{ match.matched_at | datetime_br }}</td>
+      <td class="small">{% if match.notified_at %}Enviado em {{ match.notified_at | datetime_br }}{% else %}<span class="status status-open">A enviar</span>{% endif %}</td>
+      {% if alert.telegram_chat_id %}
+      <td class="small">{% if match.telegram_notified_at %}Enviado em {{ match.telegram_notified_at | datetime_br }}{% else %}<span class="status status-open">A enviar</span>{% endif %}</td>
+      {% endif %}
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+{% else %}
+<p class="muted">Nenhuma licitação casou com este alerta ainda.</p>
+{% endif %}
+{% endblock %}

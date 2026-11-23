@@ -1,0 +1,42 @@
+<!doctype html>
+<html lang="pt-BR">
+<head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1"></head>
+<body style="margin:0;padding:0;background:#f6f7f9;font-family:Arial,Helvetica,sans-serif;color:#1c2430;">
+  <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="background:#f6f7f9;">
+    <tr><td align="center" style="padding:24px 12px;">
+      <table role="presentation" width="100%" cellpadding="0" cellspacing="0" style="max-width:640px;background:#ffffff;border:1px solid #dfe3e8;border-radius:10px;">
+        <tr><td style="padding:20px 24px;border-bottom:1px solid #dfe3e8;">
+          <div style="font-size:13px;color:#0b6e4f;font-weight:bold;">RADAR DE LICITAÇÕES</div>
+          <h1 style="font-size:20px;line-height:1.3;margin:6px 0 0;">
+            {{ matches | length }} {{ "nova licitação" if matches | length == 1 else "novas licitações" }} para “{{ alert.name }}”
+          </h1>
+          <p style="margin:6px 0 0;font-size:13px;color:#5b6676;">Prazos mais próximos primeiro. Horários seguem o {{ tz_label }}.</p>
+        </td></tr>
+        {% for match in matches %}{% set tender = match.tender %}
+        <tr><td style="padding:16px 24px;border-bottom:1px solid #eef0f3;">
+          <div style="font-size:12px;color:#5b6676;">{{ tender.modality_name }} · {{ tender.municipality_name }}/{{ tender.state }} · {{ tender.agency.name }}</div>
+          <a href="{{ detail_url(tender.id) }}" style="display:block;margin:6px 0;font-size:15px;line-height:1.4;color:#1c2430;font-weight:bold;text-decoration:none;">{{ tender.object_description | truncate(300) }}</a>
+          <div style="font-size:14px;">
+            <strong>{{ tender.estimated_value | brl }}</strong>
+            {% if tender.proposals_close_at %}
+            &nbsp;·&nbsp; Propostas até <strong>{{ tender.proposals_close_at | datetime_br }}</strong>
+            {% endif %}
+          </div>
+          <div style="margin-top:8px;font-size:13px;">
+            <a href="{{ detail_url(tender.id) }}" style="color:#0b6e4f;">Ver detalhes</a>
+            &nbsp;·&nbsp;
+            <a href="{{ tender.source_url }}" style="color:#0b6e4f;">Edital no PNCP</a>
+          </div>
+        </td></tr>
+        {% endfor %}
+        <tr><td style="padding:16px 24px;font-size:12px;color:#5b6676;line-height:1.5;">
+          Você recebe este resumo porque o alerta “{{ alert.name }}” está ativo
+          (palavras-chave: {{ alert.keywords | join(", ") }}).
+          Para alterar ou desativar, acesse <a href="{{ alerts_url }}" style="color:#0b6e4f;">a área de alertas</a>.
+          Confira sempre o edital original antes de participar.
+        </td></tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>

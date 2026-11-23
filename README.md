@@ -14,6 +14,8 @@ docker compose up --build
 ```
 
 - Aplicação: http://localhost:8000
+- Alertas (área administrativa): http://localhost:8000/admin/alertas
+- E-mails de desenvolvimento (Mailpit): http://localhost:8025
 - Documentação da API: http://localhost:8000/docs
 - Saúde: http://localhost:8000/health
 
@@ -100,6 +102,50 @@ Códigos de modalidade: 1 Leilão eletrônico, 2 Diálogo competitivo, 3 Concurs
 4 Concorrência eletrônica, 5 Concorrência presencial, 6 Pregão eletrônico, 7 Pregão presencial,
 8 Dispensa, 9 Inexigibilidade, 10 Manifestação de interesse, 11 Pré-qualificação,
 12 Credenciamento, 13 Leilão presencial.
+
+## Alertas e notificações
+
+Cadastre os alertas em **`/admin/alertas`** (senha `ADMIN_PASSWORD`; também é preciso definir
+`SECRET_KEY`). Cada alerta tem:
+
+- **palavras-chave**, uma por linha. Basta uma casar. A busca é a mesma da tela: ignora acentos e
+  plural, aceita `"frase exata"` e `-palavra` para excluir;
+- **abrangência**: UFs e/ou municípios (por nome, ex.: `Rondonópolis`; nomes repetidos em
+  outras UFs como `Pedra Preta/MT`). Sem nenhum dos dois, vale para tudo o que é coletado;
+- **faixa de valor** opcional. Licitações sem valor estimado também entram, para não perder
+  oportunidades;
+- **e-mail** do resumo e, opcionalmente, um **chat do Telegram**.
+
+**Fluxo:** depois de cada coleta, as licitações novas são cruzadas com os alertas ativos e
+gravadas em `alert_matches`. O resumo reúne o que ainda não foi enviado. Cada canal (e-mail e
+Telegram) tem sua própria marca de envio, então uma licitação nunca sai duas vezes pelo mesmo
+canal. Se um envio falhar, ela continua pendente e vai no próximo resumo. Ao criar um alerta, ele
+já é cruzado com as licitações que ainda aceitam propostas.
+
+```bash
+uv run python -m app.collect   # coleta + cruzamento com os alertas
+uv run python -m app.notify    # envia os resumos pendentes
+```
+
+Na tela de alertas também há o botão **"Enviar resumos pendentes agora"**. O envio diário
+automático entra na Fase 6.
+
+### E-mail
+
+Configure `SMTP_HOST`, `SMTP_PORT`, `SMTP_SECURITY` (`starttls`, `ssl` ou `none`),
+`SMTP_USERNAME`, `SMTP_PASSWORD` e `SMTP_FROM` no `.env`. Em desenvolvimento, o Docker Compose sobe
+o **Mailpit**, que recebe os e-mails sem enviá-los de verdade: veja-os em
+<http://localhost:8025>.
+
+### Telegram (opcional)
+
+1. Crie um bot com o [@BotFather](https://t.me/BotFather) e coloque o token em
+   `TELEGRAM_BOT_TOKEN`.
+2. Mande qualquer mensagem para o bot e abra `https://api.telegram.org/bot<TOKEN>/getUpdates`
+   para ver o `chat.id` (ou use `@nome_do_canal`, com o bot como administrador do canal).
+3. Informe esse chat no alerta.
+
+O token nunca aparece nos logs: as URLs do httpx ficam fora do log em nível INFO.
 
 ## Testes e qualidade
 

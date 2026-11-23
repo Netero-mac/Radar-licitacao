@@ -5,6 +5,9 @@
     python -m app.collect --from 2026-11-20 --modalidades 6,8
     python -m app.collect --ufs MT,MS                       # ou --ufs BR (Brasil inteiro)
 
+Depois da coleta, as licitações novas são cruzadas com os alertas ativos (o envio do
+resumo é feito por "python -m app.notify").
+
 Sai com código 0 em caso de sucesso e 1 se a coleta falhar.
 """
 
@@ -22,6 +25,7 @@ from app.db import get_sessionmaker
 from app.geo import STATES
 from app.logging_config import configure_logging
 from app.models import CollectionStatus, CollectionTrigger
+from app.services.alerts import match_new_tenders
 from app.services.collection import default_period, run_collection
 
 logger = logging.getLogger("app.collect")
@@ -115,6 +119,8 @@ def main(argv: Sequence[str] | None = None) -> int:
             source_tz=source_tz,
             trigger=CollectionTrigger.CLI,
         )
+        # Mesmo numa coleta que falhou no meio, as páginas salvas já podem casar com alertas.
+        match_new_tenders(session, created_since=run.started_at)
     return 0 if run.status == CollectionStatus.SUCCESS else 1
 
 

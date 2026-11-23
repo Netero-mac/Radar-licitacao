@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+
+{% block title %}{{ title }} · Radar de Licitações{% endblock %}
+
+{% block content %}
+<div class="empty-state">
+  <h1 class="page-title">{{ title }}</h1>
+  <p>{{ message }}</p>
+  <p><a class="button" href="{{ path_for('tender_list') }}">Ir para a lista de licitações</a></p>
+</div>
+{% endblock %}

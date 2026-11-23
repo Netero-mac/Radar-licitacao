@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+
+{% block title %}Alertas · Radar de Licitações{% endblock %}
+
+{% block content %}
+{% include "admin/_nav.html" %}
+<div class="page-header">
+  <h1 class="page-title">Alertas</h1>
+  <a class="button" href="/admin/alertas/novo">Novo alerta</a>
+</div>
+
+{% if flash %}
+<p class="notice {{ 'notice-error' if flash_error else 'notice-success' }}" role="status">{{ flash }}</p>
+{% endif %}
+{% if not email_enabled %}
+<p class="notice notice-warning">SMTP não configurado (SMTP_HOST): os resumos por e-mail não serão enviados.</p>
+{% endif %}
+
+{% if rows %}
+<div class="table-wrap">
+<table class="table">
+  <thead>
+    <tr>
+      <th scope="col">Alerta</th>
+      <th scope="col">Palavras-chave</th>
+      <th scope="col">Abrangência</th>
+      <th scope="col">Faixa de valor</th>
+      <th scope="col" class="num">Licitações</th>
+      <th scope="col" class="num">A enviar</th>
+      <th scope="col"><span class="visually-hidden">Ações</span></th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for row in rows %}{% set alert = row.alert %}
+    <tr class="{{ '' if alert.active else 'inactive' }}">
+      <td>
+        <a href="/admin/alertas/{{ alert.id }}"><strong>{{ alert.name }}</strong></a>
+        {% if not alert.active %}<span class="status status-closed">Inativo</span>{% endif %}
+        <div class="muted small">{{ alert.email }}{% if alert.telegram_chat_id %} · Telegram{% endif %}</div>
+      </td>
+      <td class="small">{{ alert.keywords | join(", ") | truncate(120) }}</td>
+      <td class="small">
+        {% if not alert.states and not alert.municipalities %}Tudo o que é coletado{% endif %}
+        {% if alert.states %}{{ alert.states | join(", ") }}{% endif %}
+        {% if alert.municipalities %}{% if alert.states %}; {% endif %}{% for code in alert.municipalities[:3] %}{{ municipality_label(code) }}{% if not loop.last %}, {% endif %}{% endfor %}{% if alert.municipalities | length > 3 %} e mais {{ alert.municipalities | length - 3 }}{% endif %}{% endif %}
+      </td>
+      <td class="small">
+        {% if alert.min_value is none and alert.max_value is none %}Qualquer valor
+        {% elif alert.max_value is none %}A partir de {{ alert.min_value | brl }}
+        {% elif alert.min_value is none %}Até {{ alert.max_value | brl }}
+        {% else %}{{ alert.min_value | brl }} a {{ alert.max_value | brl }}{% endif %}
+      </td>
+      <td class="num">{{ row.matches }}</td>
+      <td class="num">{{ row.pending_email }}</td>
+      <td class="row-actions">
+        <a href="/admin/alertas/{{ alert.id }}/editar">Editar</a>
+        <form method="post" action="/admin/alertas/{{ alert.id }}/ativo">
+          <input type="hidden" name="active" value="{{ '0' if alert.active else '1' }}">
+          <button type="submit" class="link-button">{{ "Desativar" if alert.active else "Ativar" }}</button>
+        </form>
+        {#- tojson: o nome vai para dentro de JavaScript; escapar como HTML não bastaria. -#}
+        <form method="post" action="/admin/alertas/{{ alert.id }}/excluir"
+              onsubmit='return confirm({{ ("Excluir o alerta “" ~ alert.name ~ "” e o histórico dele?") | tojson }});'>
+          <button type="submit" class="link-button danger">Excluir</button>
+        </form>
+      </td>
+    </tr>
+    {% endfor %}
+  </tbody>
+</table>
+</div>
+
+<form class="digest-form" method="post" action="/admin/resumos/enviar">
+  <button type="submit" class="button-secondary">Enviar resumos pendentes agora</button>
+  <span class="muted small">Normalmente o envio é automático, uma vez por dia.</span>
+</form>
+{% else %}
+<div class="empty-state card">
+  <p>Nenhum alerta cadastrado ainda.</p>
+  <p>Um alerta avisa por e-mail (e, se quiser, pelo Telegram) quando surge uma licitação com as palavras-chave escolhidas.</p>
+  <p><a class="button" href="/admin/alertas/novo">Criar o primeiro alerta</a></p>
+</div>
+{% endif %}
+{% endblock %}

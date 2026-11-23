@@ -1,0 +1,99 @@
+{% extends "base.html" %}
+
+{% block title %}{{ "Editar alerta" if alert else "Novo alerta" }} · Radar de Licitações{% endblock %}
+
+{% macro error_for(field) -%}
+  {% if errors.get(field) %}<p class="field-error" id="{{ field }}-error">{{ errors[field] }}</p>{% endif %}
+{%- endmacro %}
+
+{% macro invalid(field) -%}
+  {% if errors.get(field) %} aria-invalid="true" aria-describedby="{{ field }}-error"{% endif %}
+{%- endmacro %}
+
+{% block content %}
+{% include "admin/_nav.html" %}
+<p class="breadcrumb"><a href="/admin/alertas">← Alertas</a></p>
+<h1 class="page-title">{{ "Editar alerta" if alert else "Novo alerta" }}</h1>
+
+<form class="card form-stack" method="post"
+      action="{{ '/admin/alertas/%d/editar' % alert.id if alert else '/admin/alertas/novo' }}" novalidate>
+  {% if errors %}
+  <p class="notice notice-error" role="alert">Corrija os campos destacados.{% if errors.get('__all__') %} {{ errors['__all__'] }}{% endif %}</p>
+  {% endif %}
+
+  <div class="form-grid">
+    <div class="field">
+      <label for="name">Nome do alerta</label>
+      <input id="name" name="name" value="{{ values.name or '' }}" maxlength="120" required
+             placeholder="Ex.: TI em Rondonópolis"{{ invalid('name') }}>
+      {{ error_for('name') }}
+    </div>
+    <div class="field">
+      <label for="email">E-mail para o resumo diário</label>
+      <input id="email" name="email" type="email" value="{{ values.email or '' }}" maxlength="254" required{{ invalid('email') }}>
+      {{ error_for('email') }}
+    </div>
+  </div>
+
+  <div class="field">
+    <label for="keywords">Palavras-chave <span class="muted">(uma por linha)</span></label>
+    <textarea id="keywords" name="keywords" rows="5" required{{ invalid('keywords') }}
+              placeholder="manutenção de computadores&#10;impressora&#10;&quot;ar condicionado&quot;">{{ values.keywords or '' }}</textarea>
+    <p class="hint">Basta uma linha casar. Acentos e plural não importam ("computador" encontra "COMPUTADORES"). Use aspas para frase exata e <code>-palavra</code> para excluir.</p>
+    {{ error_for('keywords') }}
+  </div>
+
+  {% if state_choices | length > 1 %}
+  <fieldset class="field">
+    <legend>UFs <span class="muted">(opcional)</span></legend>
+    <div class="checkbox-grid">
+      {% for code, name in state_choices %}
+      <label class="checkbox"><input type="checkbox" name="states" value="{{ code }}"{% if code in values.states %} checked{% endif %}> {{ code }}</label>
+      {% endfor %}
+    </div>
+    {{ error_for('states') }}
+  </fieldset>
+  {% endif %}
+
+  <div class="field">
+    <label for="municipalities">Municípios <span class="muted">(opcional, um por linha)</span></label>
+    <textarea id="municipalities" name="municipalities" rows="3"{{ invalid('municipalities') }}
+              placeholder="Rondonópolis&#10;Pedra Preta">{{ values.municipalities or '' }}</textarea>
+    <p class="hint">
+      Sem UF nem município, o alerta vale para tudo o que é coletado. Com os dois, vale para as UFs marcadas
+      <em>e também</em> para os municípios listados. Se o nome existir em mais de uma UF, escreva "Nome/UF".
+    </p>
+    {{ error_for('municipalities') }}
+  </div>
+
+  <fieldset class="field range">
+    <legend>Valor estimado (R$) <span class="muted">(opcional)</span></legend>
+    <input name="min_value" type="number" min="0" step="0.01" value="{{ values.min_value }}" placeholder="mínimo" aria-label="Valor mínimo"{{ invalid('min_value') }}>
+    <span aria-hidden="true">a</span>
+    <input name="max_value" type="number" min="0" step="0.01" value="{{ values.max_value }}" placeholder="máximo" aria-label="Valor máximo"{{ invalid('max_value') }}>
+    <p class="hint">Licitações sem valor estimado informado também entram no alerta.</p>
+    {{ error_for('min_value') }}{{ error_for('max_value') }}
+  </fieldset>
+
+  <div class="field">
+    <label for="telegram_chat_id">Chat do Telegram <span class="muted">(opcional)</span></label>
+    <input id="telegram_chat_id" name="telegram_chat_id" value="{{ values.telegram_chat_id or '' }}" maxlength="40"
+           placeholder="Ex.: 123456789 ou @meu_canal"{{ invalid('telegram_chat_id') }}>
+    {% if telegram_enabled %}
+    <p class="hint">Mande uma mensagem para o bot e veja o número do chat em <code>https://api.telegram.org/bot&lt;TOKEN&gt;/getUpdates</code>.</p>
+    {% else %}
+    <p class="hint">O envio pelo Telegram está desativado (defina TELEGRAM_BOT_TOKEN no .env).</p>
+    {% endif %}
+    {{ error_for('telegram_chat_id') }}
+  </div>
+
+  <label class="checkbox">
+    <input type="checkbox" name="active"{% if values.active %} checked{% endif %}> Alerta ativo
+  </label>
+
+  <div class="actions">
+    <button type="submit">{{ "Salvar alterações" if alert else "Criar alerta" }}</button>
+    <a class="button-secondary" href="/admin/alertas">Cancelar</a>
+  </div>
+</form>
+{% endblock %}

@@ -53,7 +53,12 @@ class Alert(TimestampMixin, Base):
 
 
 class AlertMatch(Base):
-    """Licitação que casou com um alerta; notified_at fica nulo até o envio."""
+    """Licitação que casou com um alerta.
+
+    Cada canal tem sua marca de envio: notified_at (e-mail) e telegram_notified_at. Ficam
+    nulas até a mensagem sair, o que garante não notificar a mesma licitação duas vezes
+    pelo mesmo canal (junto com a unicidade alert_id + tender_id).
+    """
 
     __tablename__ = "alert_matches"
 
@@ -62,6 +67,7 @@ class AlertMatch(Base):
     tender_id: Mapped[int] = mapped_column(ForeignKey("tenders.id", ondelete="CASCADE"), index=True)
     matched_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), server_default=func.now())
     notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
+    telegram_notified_at: Mapped[datetime | None] = mapped_column(DateTime(timezone=True))
 
     alert: Mapped["Alert"] = relationship(back_populates="matches")
     tender: Mapped["Tender"] = relationship(back_populates="matches")

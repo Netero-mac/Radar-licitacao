@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+
+{% block title %}Entrar · Radar de Licitações{% endblock %}
+
+{% block content %}
+<div class="narrow">
+  <h1 class="page-title">Área administrativa</h1>
+  <form class="card form-stack" method="post" action="{{ path_for('admin_login') }}">
+    {% if error %}<p class="notice notice-error" role="alert">{{ error }}</p>{% endif %}
+    <input type="hidden" name="next" value="{{ next }}">
+    <div class="field">
+      <label for="password">Senha</label>
+      <input id="password" name="password" type="password" autocomplete="current-password" required autofocus>
+    </div>
+    <div class="actions"><button type="submit">Entrar</button></div>
+  </form>
+</div>
+{% endblock %}

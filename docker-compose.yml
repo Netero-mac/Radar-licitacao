@@ -26,6 +26,10 @@ services:
     environment:
       DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}
       TEST_DATABASE_URL: postgresql+psycopg://${POSTGRES_USER}:${POSTGRES_PASSWORD}@db:5432/${POSTGRES_DB}_test
+      # E-mails vão para o Mailpit (nada é enviado de verdade): http://localhost:8025
+      SMTP_HOST: mailpit
+      SMTP_PORT: "1025"
+      SMTP_SECURITY: none
     command: >
       sh -c "alembic upgrade head &&
              uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload"
@@ -36,6 +40,15 @@ services:
     depends_on:
       db:
         condition: service_healthy
+      mailpit:
+        condition: service_started
+
+  # Caixa de e-mail falsa para desenvolvimento: captura tudo o que a app envia.
+  mailpit:
+    image: axllent/mailpit:v1.27
+    ports:
+      - "8025:8025"  # interface web
+      - "1025:1025"  # SMTP
 
 volumes:
   pgdata:

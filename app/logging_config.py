@@ -46,3 +46,6 @@ def configure_logging(level: str = "INFO", fmt: str = "json") -> None:
     root = logging.getLogger()
     root.handlers[:] = [handler]
     root.setLevel(level.upper())
+    # O httpx registra cada URL em INFO; a do Telegram contém o token do bot. Os eventos
+    # relevantes (páginas coletadas, falhas, novas tentativas) já são logados pela aplicação.
+    logging.getLogger("httpx").setLevel(max(logging.WARNING, root.level))

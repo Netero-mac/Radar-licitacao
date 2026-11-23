@@ -3,7 +3,7 @@
 from functools import lru_cache
 from typing import Annotated, Literal
 
-from pydantic import Field, field_validator
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 from app.geo import STATES
@@ -48,6 +48,52 @@ class Settings(BaseSettings):
     # As datas da API vêm sem fuso; o PNCP usa o horário de Brasília.
     pncp_timezone: str = "America/Sao_Paulo"
     collection_lookback_days: int = Field(default=2, ge=1)
+
+    # Endereço público da aplicação, usado nos links dos e-mails e do Telegram.
+    app_base_url: str = "http://localhost:8000"
+
+    # --- Administração (cadastro de alertas) ---
+    # Sem ADMIN_PASSWORD e SECRET_KEY a área administrativa fica desativada.
+    admin_password: SecretStr | None = None
+    secret_key: SecretStr | None = None
+    admin_session_hours: int = Field(default=12, ge=1)
+
+    # --- E-mail (SMTP) ---
+    # Sem SMTP_HOST o envio de e-mail fica desativado.
+    smtp_host: str | None = None
+    smtp_port: int = 587
+    smtp_username: str | None = None
+    smtp_password: SecretStr | None = None
+    smtp_security: Literal["starttls", "ssl", "none"] = "starttls"
+    smtp_from: str = "Radar de Licitações <radar@localhost>"
+    smtp_timeout_seconds: float = Field(default=30.0, gt=0)
+
+    # --- Telegram (opcional) ---
+    telegram_bot_token: SecretStr | None = None
+    telegram_api_url: str = "https://api.telegram.org"
+
+    @property
+    def admin_enabled(self) -> bool:
+        return bool(
+            self.admin_password
+            and self.admin_password.get_secret_value()
+            and self.secret_key
+            and self.secret_key.get_secret_value()
+        )
+
+    @field_validator(
+        "admin_password",
+        "secret_key",
+        "smtp_host",
+        "smtp_username",
+        "smtp_password",
+        "telegram_bot_token",
+        mode="before",
+    )
+    @classmethod
+    def _empty_as_none(cls, value: object) -> object:
+        """Variável presente mas vazia no .env (SMTP_HOST=) = não configurada."""
+        return None if isinstance(value, str) and not value.strip() else value
 
     @field_validator("pncp_modalities", mode="before")
     @classmethod

@@ -7,7 +7,7 @@ from typing import Any
 
 from sqlalchemy.orm import Session
 
-from app.models import Agency, Sphere, Tender
+from app.models import Agency, Alert, Sphere, Tender
 
 _sequence = count(1)
 
@@ -63,3 +63,21 @@ def make_tender(
     session.add(tender)
     session.flush()
     return tender
+
+
+def make_alert(session: Session, **overrides: Any) -> Alert:
+    n = next(_sequence)
+    alert = Alert(
+        **{
+            "name": f"Alerta {n}",
+            "email": f"empresa{n}@exemplo.com",
+            "keywords": ["manutenção"],
+            "states": [],
+            "municipalities": [],
+            "active": True,
+            **overrides,
+        }
+    )
+    session.add(alert)
+    session.flush()
+    return alert
