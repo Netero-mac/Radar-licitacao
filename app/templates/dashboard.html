@@ -1,0 +1,161 @@
+{% extends "base.html" %}
+
+{% block title %}Painel · Radar de Licitações MT{% endblock %}
+
+{% macro chart(title, subtitle, endpoint, kind, measure, description) -%}
+<figure class="card chart-card">
+  <figcaption>
+    <h3 class="chart-title">{{ title }}</h3>
+    {% if subtitle %}<p class="chart-subtitle">{{ subtitle }}</p>{% endif %}
+  </figcaption>
+  <div class="chart-box" data-kind="{{ kind }}">
+    <canvas data-chart data-endpoint="{{ endpoint }}" data-kind="{{ kind }}" data-measure="{{ measure }}"
+            role="img" aria-label="{{ description }} Os valores estão na tabela desta seção."></canvas>
+  </div>
+</figure>
+{%- endmacro %}
+
+{% block content %}
+<div id="content">
+<div class="page-header">
+  <h1 class="page-title">Painel{% if filters.state %} · {{ state_name(filters.state) }}{% elif states | length == 1 %} · {{ state_name(states[0]) }}{% endif %}</h1>
+  <p class="muted">
+    Licitações publicadas de {{ summary.period.start | day_br }} a {{ summary.period.end | day_br }}
+    (o mês atual ainda está em andamento).
+  </p>
+</div>
+
+<form class="filters dashboard-filters" method="get" action="{{ path_for('dashboard') }}"
+      hx-get="{{ path_for('dashboard') }}" hx-trigger="change" hx-target="#content"
+      hx-select="#content" hx-swap="outerHTML" hx-push-url="true">
+  <div class="field">
+    <label for="months">Período</label>
+    <select id="months" name="months">
+      {% for months in period_months %}
+      <option value="{{ months }}"{% if filters.months == months %} selected{% endif %}>Últimos {{ months }} meses</option>
+      {% endfor %}
+    </select>
+  </div>
+  {% if states | length > 1 %}
+  <div class="field">
+    <label for="state">UF</label>
+    <select id="state" name="state">
+      <option value="">Todas</option>
+      {% for code in states %}
+      <option value="{{ code }}"{% if filters.state == code %} selected{% endif %}>{{ code }} · {{ state_name(code) }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  {% endif %}
+  <div class="field field-actions">
+    <button type="submit" class="button">Atualizar</button>
+  </div>
+</form>
+
+{% for error in errors %}<p class="notice notice-warning" role="status">{{ error }}</p>{% endfor %}
+
+<section class="kpis" aria-label="Totais do período">
+  <div class="card kpi">
+    <span class="kpi-label">Licitações</span>
+    <strong class="kpi-value">{{ summary.tenders | number }}</strong>
+  </div>
+  <div class="card kpi">
+    <span class="kpi-label">Valor estimado</span>
+    <strong class="kpi-value" title="{{ summary.total_value | brl }}">{{ summary.total_value | brl_compact }}</strong>
+    {% if summary.without_value %}<span class="kpi-note">{{ summary.without_value | number }} sem valor informado</span>{% endif %}
+  </div>
+  <div class="card kpi">
+    <span class="kpi-label">Com propostas abertas</span>
+    <strong class="kpi-value">{{ summary.open_now | number }}</strong>
+    <a class="kpi-note" href="{{ path_for('tender_list') }}?open_only=on{% if filters.state %}&amp;state={{ filters.state }}{% endif %}">ver licitações</a>
+  </div>
+  <div class="card kpi">
+    <span class="kpi-label">Municípios</span>
+    <strong class="kpi-value">{{ summary.municipalities | number }}</strong>
+  </div>
+</section>
+
+{% if not summary.tenders %}
+<p class="empty-state card">Nenhuma licitação publicada neste período. Rode uma coleta
+  (<code>python -m app.collect</code>) ou escolha um período maior.</p>
+{% else %}
+<p class="chart-status muted" data-chart-status hidden></p>
+
+<section class="dashboard-section" aria-labelledby="sec-municipios">
+  <h2 id="sec-municipios" class="section-title">Por município</h2>
+  <div class="chart-grid">
+    {{ chart("Quantidade de licitações", "Os " ~ by_count.items | length ~ " municípios com mais licitações, de " ~ by_count.total_municipalities ~ ".",
+             "/api/dashboard/municipalities?" ~ api_query ~ "&order=tenders", "hbar", "tenders",
+             "Barras horizontais: quantidade de licitações por município.") }}
+    {{ chart("Valor estimado", "Os " ~ by_value.items | length ~ " municípios com maior valor estimado somado.",
+             "/api/dashboard/municipalities?" ~ api_query ~ "&order=value", "hbar", "total_value",
+             "Barras horizontais: valor estimado somado por município.") }}
+  </div>
+  <details class="data-table">
+    <summary>Ver como tabela</summary>
+    <table>
+      <thead><tr><th scope="col">Município</th><th scope="col" class="num">Licitações</th><th scope="col" class="num">Valor estimado</th></tr></thead>
+      <tbody>
+        {% for item in by_count.items %}
+        <tr><td>{{ item.label }}</td><td class="num">{{ item.tenders | number }}</td><td class="num">{{ item.total_value | brl }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </details>
+</section>
+
+<section class="dashboard-section" aria-labelledby="sec-categorias">
+  <h2 id="sec-categorias" class="section-title">Por categoria</h2>
+  <div class="chart-grid chart-grid-single">
+    {{ chart("Licitações por categoria",
+             "Agrupadas por palavras-chave no objeto. Uma licitação pode entrar em mais de uma categoria; "
+             ~ categories.uncategorized.tenders | number ~ " não entraram em nenhuma.",
+             "/api/dashboard/categories?" ~ api_query, "hbar", "tenders",
+             "Barras horizontais: quantidade de licitações por categoria.") }}
+  </div>
+  <details class="data-table">
+    <summary>Ver como tabela (e as palavras-chave de cada categoria)</summary>
+    <table>
+      <thead><tr><th scope="col">Categoria</th><th scope="col">Palavras-chave</th><th scope="col" class="num">Licitações</th><th scope="col" class="num">Valor estimado</th></tr></thead>
+      <tbody>
+        {% for item in categories.items %}
+        <tr><td>{{ item.label }}</td><td class="muted">{{ item.keywords | join(", ") }}</td><td class="num">{{ item.tenders | number }}</td><td class="num">{{ item.total_value | brl }}</td></tr>
+        {% endfor %}
+        <tr><td>{{ categories.uncategorized.label }}</td><td class="muted">—</td><td class="num">{{ categories.uncategorized.tenders | number }}</td><td class="num">{{ categories.uncategorized.total_value | brl }}</td></tr>
+      </tbody>
+    </table>
+  </details>
+</section>
+
+<section class="dashboard-section" aria-labelledby="sec-mensal">
+  <h2 id="sec-mensal" class="section-title">Evolução mensal</h2>
+  <div class="chart-grid">
+    {{ chart("Licitações publicadas por mês", "O último mês está em andamento.",
+             "/api/dashboard/monthly?" ~ api_query, "line", "tenders",
+             "Linha: quantidade de licitações publicadas por mês.") }}
+    {{ chart("Valor estimado por mês", "Soma dos valores informados.",
+             "/api/dashboard/monthly?" ~ api_query, "column", "total_value",
+             "Colunas: valor estimado somado por mês.") }}
+  </div>
+  <details class="data-table">
+    <summary>Ver como tabela</summary>
+    <table>
+      <thead><tr><th scope="col">Mês</th><th scope="col" class="num">Licitações</th><th scope="col" class="num">Valor estimado</th></tr></thead>
+      <tbody>
+        {% for item in monthly.items %}
+        <tr><td>{{ item.label }}{% if item.partial %} (em andamento){% endif %}</td><td class="num">{{ item.tenders | number }}</td><td class="num">{{ item.total_value | brl }}</td></tr>
+        {% endfor %}
+      </tbody>
+    </table>
+  </details>
+</section>
+{% endif %}
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.6.1/dist/chart.umd.min.js"
+        integrity="sha384-Emf5ZVIUiarAdhkgtqK+5/Z5qIvM6QoVrS+qAVtfyZVuD5lIHrac0me485+Antp0"
+        crossorigin="anonymous" defer></script>
+<script src="{{ path_for('static', path='js/dashboard.js') }}" defer></script>
+{% endblock %}

@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse, RedirectResponse, Response
 from fastapi.staticfiles import StaticFiles
 
 from app import __version__
-from app.api import admin, health, pages, tenders
+from app.api import admin, dashboard, health, pages, tenders
 from app.api.templating import STATIC_DIR, get_templates
 from app.config import get_settings
 from app.logging_config import configure_logging
@@ -69,6 +69,7 @@ def create_app() -> FastAPI:
     app.add_exception_handler(RequestValidationError, validation_error_handler)
     app.include_router(health.router)
     app.include_router(tenders.router)
+    app.include_router(dashboard.router)
     app.include_router(pages.router)
     app.include_router(admin.router)
     app.add_exception_handler(admin.AdminLoginRequiredError, admin_login_required_handler)

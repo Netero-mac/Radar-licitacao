@@ -5,6 +5,7 @@ paginação trocam só o bloco de resultados: a requisição chega com o cabeça
 e devolvemos apenas o template parcial.
 """
 
+from datetime import UTC, datetime
 from typing import Annotated
 from urllib.parse import urlencode
 from zoneinfo import ZoneInfo
@@ -16,7 +17,9 @@ from sqlalchemy.orm import Session
 from app.api.templating import display_timezone, get_templates
 from app.db import get_session
 from app.geo import municipality_in_state
+from app.schemas.dashboard import PERIOD_MONTHS, DashboardFilters, RankingParams
 from app.schemas.tenders import TenderFilters
+from app.services import dashboard as dashboard_service
 from app.services import tenders as service
 
 router = APIRouter(include_in_schema=False)
@@ -85,3 +88,31 @@ def tender_detail(tender_id: int, request: Request, session: SessionDep) -> HTML
             request, "not_found.html", {"message": "Licitação não encontrada."}, status_code=404
         )
     return get_templates().TemplateResponse(request, "tenders/detail.html", {"tender": detail})
+
+
+@router.get("/painel", response_class=HTMLResponse, name="dashboard")
+def dashboard(request: Request, session: SessionDep, tz: TimezoneDep) -> HTMLResponse:
+    """Painel: as tabelas vêm prontas do servidor; os gráficos leem /api/dashboard/*."""
+    filters, errors = DashboardFilters.from_query_lenient(dict(request.query_params))
+    now = datetime.now(UTC)
+    summary = dashboard_service.summary(session, filters, tz, now)
+    context = {
+        "filters": filters,
+        "errors": errors,
+        "states": service.states(session),
+        "period_months": PERIOD_MONTHS,
+        "summary": summary,
+        "api_query": urlencode(filters.query_params()),
+    }
+    if summary.tenders:
+        context |= {
+            "by_count": dashboard_service.municipalities(
+                session, filters, RankingParams(order="tenders"), tz, now
+            ),
+            "by_value": dashboard_service.municipalities(
+                session, filters, RankingParams(order="value"), tz, now
+            ),
+            "categories": dashboard_service.categories(session, filters, tz, now),
+            "monthly": dashboard_service.monthly(session, filters, tz, now),
+        }
+    return get_templates().TemplateResponse(request, "dashboard.html", context)

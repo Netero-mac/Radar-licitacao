@@ -15,6 +15,7 @@
       </a>
       <nav aria-label="Principal">
         <a href="{{ path_for('tender_list') }}">Licitações</a>
+        <a href="{{ path_for('dashboard') }}">Painel</a>
         <a href="/admin/alertas">Alertas</a>
         <a href="/docs">API</a>
       </nav>
@@ -31,5 +32,6 @@
       Datas e horas seguem o {{ tz_label }}. Confira sempre o edital original antes de participar.
     </div>
   </footer>
+  {% block scripts %}{% endblock %}
 </body>
 </html>

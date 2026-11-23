@@ -1,6 +1,6 @@
 """Formatação para exibição em português do Brasil (sem depender do locale do sistema)."""
 
-from datetime import datetime
+from datetime import date, datetime
 from decimal import ROUND_HALF_UP, Decimal
 from zoneinfo import ZoneInfo
 
@@ -36,3 +36,26 @@ def format_cnpj(value: str) -> str:
     if len(value) != 14 or not value.isdigit():
         return value
     return f"{value[:2]}.{value[2:5]}.{value[5:8]}/{value[8:12]}-{value[12:]}"
+
+
+def format_number(value: int) -> str:
+    """Ex.: 12345 -> 12.345."""
+    return f"{value:,}".replace(",", ".")
+
+
+_COMPACT = ((Decimal("1e9"), "bi"), (Decimal("1e6"), "mi"), (Decimal("1e3"), "mil"))
+
+
+def format_brl_compact(value: Decimal) -> str:
+    """Valor resumido para destaques: R$ 12,9 mi, R$ 350 mil, R$ 1,2 bi."""
+    for scale, suffix in _COMPACT:
+        if abs(value) >= scale:
+            scaled = (value / scale).quantize(Decimal("0.1"), rounding=ROUND_HALF_UP)
+            text = f"{scaled:f}".removesuffix(".0").replace(".", ",")
+            return f"R$ {text} {suffix}"
+    return format_brl(value)
+
+
+def format_day(value: date) -> str:
+    """Data de calendário (sem fuso): 01/11/2026."""
+    return value.strftime("%d/%m/%Y")

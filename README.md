@@ -14,6 +14,7 @@ docker compose up --build
 ```
 
 - Aplicação: http://localhost:8000
+- Painel: http://localhost:8000/painel
 - Alertas (área administrativa): http://localhost:8000/admin/alertas
 - E-mails de desenvolvimento (Mailpit): http://localhost:8025
 - Documentação da API: http://localhost:8000/docs
@@ -102,6 +103,23 @@ Códigos de modalidade: 1 Leilão eletrônico, 2 Diálogo competitivo, 3 Concurs
 4 Concorrência eletrônica, 5 Concorrência presencial, 6 Pregão eletrônico, 7 Pregão presencial,
 8 Dispensa, 9 Inexigibilidade, 10 Manifestação de interesse, 11 Pré-qualificação,
 12 Credenciamento, 13 Leilão presencial.
+
+## Painel
+
+Em **`/painel`**: totais do período (licitações, valor estimado, propostas abertas, municípios),
+ranking de municípios por quantidade e por valor, licitações por categoria e evolução mensal.
+Os filtros de período (últimos 3, 6, 12 ou 24 meses, sempre incluindo o mês atual) e de UF
+valem para tudo na página.
+
+- Os gráficos usam **Chart.js 4.6.1 via CDN** (jsDelivr, com hash de integridade SRI) e leem a
+  API JSON `GET /api/dashboard/summary`, `/municipalities?order=tenders|value&limit=15`,
+  `/categories` e `/monthly`, todas com `months` e `state`. Veja em `/docs`.
+- Cada gráfico tem uma **tabela equivalente** ("Ver como tabela"), gerada no servidor. Se o CDN
+  estiver fora do ar, as tabelas abrem sozinhas.
+- **Categorias** são grupos de palavras-chave no objeto, definidos em `app/categories.py`, porque
+  o PNCP não classifica o objeto. Uma licitação pode cair em mais de uma categoria.
+- Licitações sem valor estimado contam na quantidade, mas não na soma de valores.
+- O mês de cada licitação é o da publicação no horário de Brasília (não em UTC).
 
 ## Alertas e notificações
 

@@ -91,14 +91,14 @@ class TenderQuery:
     open_at: datetime | None = None  # prazo de propostas ainda não encerrado neste instante
 
 
-_SEARCH_REGCONFIG = literal_column(f"'{SEARCH_CONFIG}'::regconfig")
+SEARCH_REGCONFIG = literal_column(f"'{SEARCH_CONFIG}'::regconfig")
 
 
-def _conditions(query: TenderQuery) -> list[ColumnElement[bool]]:
+def filter_conditions(query: TenderQuery) -> list[ColumnElement[bool]]:
     conditions: list[ColumnElement[bool]] = []
     if query.text:
         # websearch_to_tsquery aceita "frase exata", OR e -palavra, sem erro de sintaxe.
-        tsquery = func.websearch_to_tsquery(_SEARCH_REGCONFIG, query.text)
+        tsquery = func.websearch_to_tsquery(SEARCH_REGCONFIG, query.text)
         # Busca só com palavras vazias ("de", "para") vira consulta vazia: não filtra.
         conditions.append(or_(func.numnode(tsquery) == 0, Tender.search_vector.op("@@")(tsquery)))
     if query.state:
@@ -125,7 +125,7 @@ def search_tenders(
     session: Session, query: TenderQuery, *, limit: int, offset: int
 ) -> tuple[list[Tender], int]:
     """Página de licitações (mais recentes primeiro) e o total que atende aos critérios."""
-    conditions = _conditions(query)
+    conditions = filter_conditions(query)
     total = session.scalar(select(func.count()).select_from(Tender).where(*conditions)) or 0
     stmt = (
         select(Tender)
