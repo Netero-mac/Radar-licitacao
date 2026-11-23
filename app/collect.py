@@ -3,6 +3,7 @@
     python -m app.collect                                   # período padrão (últimos 2 dias)
     python -m app.collect --from 2026-11-01 --to 2026-11-22
     python -m app.collect --from 2026-11-20 --modalidades 6,8
+    python -m app.collect --ufs MT,MS                       # ou --ufs BR (Brasil inteiro)
 
 Sai com código 0 em caso de sucesso e 1 se a coleta falhar.
 """
@@ -18,6 +19,7 @@ from app.collectors.pncp import PncpClient
 from app.collectors.pncp.modalities import MODALITIES
 from app.config import get_settings
 from app.db import get_sessionmaker
+from app.geo import STATES
 from app.logging_config import configure_logging
 from app.models import CollectionStatus, CollectionTrigger
 from app.services.collection import default_period, run_collection
@@ -43,6 +45,16 @@ def _modalities(value: str) -> list[int]:
     return codes
 
 
+def _states(value: str) -> list[str]:
+    codes = [part.strip().upper() for part in value.split(",") if part.strip()]
+    if codes == ["BR"]:
+        return []
+    unknown = [code for code in codes if code not in STATES]
+    if not codes or unknown:
+        raise argparse.ArgumentTypeError(f"UF(s) desconhecida(s): {unknown}")
+    return codes
+
+
 def build_parser() -> argparse.ArgumentParser:
     modalities_help = ", ".join(f"{code}={name}" for code, name in MODALITIES.items())
     parser = argparse.ArgumentParser(
@@ -58,6 +70,12 @@ def build_parser() -> argparse.ArgumentParser:
         dest="modalities",
         type=_modalities,
         help=f"códigos separados por vírgula (padrão: PNCP_MODALITIES). {modalities_help}",
+    )
+    parser.add_argument(
+        "--ufs",
+        dest="states",
+        type=_states,
+        help="UFs separadas por vírgula, ou BR para o Brasil inteiro (padrão: PNCP_STATES)",
     )
     return parser
 
@@ -92,7 +110,7 @@ def main(argv: Sequence[str] | None = None) -> int:
             client,
             date_from=date_from,
             date_to=date_to,
-            state=settings.pncp_state,
+            states=args.states if args.states is not None else settings.pncp_states,
             modalities=args.modalities or settings.pncp_modalities,
             source_tz=source_tz,
             trigger=CollectionTrigger.CLI,

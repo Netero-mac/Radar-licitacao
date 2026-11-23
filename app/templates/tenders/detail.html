@@ -18,7 +18,7 @@
       <span class="value">{{ tender.estimated_value | brl }}</span>
     </div>
     <div>
-      <span class="label">Recebimento de propostas</span>
+      <span class="label">Recebimento de propostas ({{ tz_label }})</span>
       {% if tender.proposals_close_at %}
         <span>{{ tender.proposals_open_at | datetime_br }} até {{ tender.proposals_close_at | datetime_br }}</span>
         {% if tender.proposals_open %}

@@ -11,6 +11,7 @@ from jinja2 import pass_context
 from app import formatting
 from app.collectors.pncp.modalities import MODALITIES
 from app.config import get_settings
+from app.geo import state_name
 
 APP_DIR = Path(__file__).resolve().parent.parent
 TEMPLATES_DIR = APP_DIR / "templates"
@@ -19,6 +20,18 @@ STATIC_DIR = APP_DIR / "static"
 
 def display_timezone() -> ZoneInfo:
     return ZoneInfo(get_settings().display_timezone)
+
+
+TIMEZONE_LABELS = {
+    "America/Sao_Paulo": "horário de Brasília",
+    "America/Cuiaba": "horário de Cuiabá",
+    "America/Campo_Grande": "horário de Campo Grande",
+    "America/Manaus": "horário de Manaus",
+}
+
+
+def timezone_label(tz: ZoneInfo) -> str:
+    return TIMEZONE_LABELS.get(str(tz), f"fuso {tz}")
 
 
 @pass_context
@@ -42,5 +55,6 @@ def get_templates() -> Jinja2Templates:
     env.filters["cnpj"] = formatting.format_cnpj
     env.globals["path_for"] = path_for
     env.globals["modalities"] = MODALITIES
-    env.globals["display_timezone"] = str(tz)
+    env.globals["tz_label"] = timezone_label(tz)
+    env.globals["state_name"] = state_name
     return templates

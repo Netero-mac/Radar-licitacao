@@ -5,6 +5,7 @@ from decimal import Decimal
 from typing import Annotated, Any, Self
 
 from pydantic import (
+    AfterValidator,
     BaseModel,
     BeforeValidator,
     ConfigDict,
@@ -16,6 +17,7 @@ from pydantic import (
 )
 from pydantic_core import PydanticUseDefault
 
+from app.geo import STATES
 from app.models import Sphere
 from app.schemas.errors import translate_error
 
@@ -39,6 +41,15 @@ def _parse_bool(value: Any) -> Any:
 BlankAsDefault = BeforeValidator(_blank_to_default)
 
 
+def _check_state(value: str) -> str:
+    value = value.upper()
+    if value not in STATES:
+        raise ValueError("UF desconhecida")
+    return value
+
+
+StateCode = Annotated[str, AfterValidator(_check_state)]
+
 # Restrição no próprio str (e não no "str | None") para o erro sair como "string_too_long".
 SearchText = Annotated[str, StringConstraints(max_length=200)]
 
@@ -53,6 +64,9 @@ class TenderFilters(BaseModel):
         BlankAsDefault,
         Field(description='Busca no objeto. Ignora acentos; aceita "frase exata", OR e -exclusão.'),
     ] = None
+    state: Annotated[StateCode | None, BlankAsDefault, Field(description="UF (sigla, ex.: MT)")] = (
+        None
+    )
     municipality: Annotated[
         str | None,
         BlankAsDefault,
@@ -145,6 +159,7 @@ class TenderFilters(BaseModel):
 
 FIELD_LABELS = {
     "q": "Busca",
+    "state": "UF",
     "municipality": "Município",
     "modality": "Modalidade",
     "min_value": "Valor mínimo",

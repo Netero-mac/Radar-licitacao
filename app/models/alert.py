@@ -30,7 +30,9 @@ class Alert(TimestampMixin, Base):
     name: Mapped[str] = mapped_column(String(120))
     email: Mapped[str] = mapped_column(String(254))
     keywords: Mapped[list[str]] = mapped_column(ARRAY(String(120)))
-    # Códigos IBGE; lista vazia significa todo o estado de MT.
+    # Abrangência: UFs e/ou municípios (códigos IBGE). Uma licitação entra se for de uma das
+    # UFs OU de um dos municípios; as duas listas vazias = todas as UFs coletadas.
+    states: Mapped[list[str]] = mapped_column(ARRAY(String(2)), server_default=text("'{}'"))
     municipalities: Mapped[list[str]] = mapped_column(ARRAY(String(7)), server_default=text("'{}'"))
     min_value: Mapped[Decimal | None] = mapped_column(Numeric(18, 2))
     max_value: Mapped[Decimal | None] = mapped_column(Numeric(18, 2))

@@ -49,7 +49,7 @@ def _run(session: Session, client: PncpClient) -> CollectionRun:
         client,
         date_from=date(2026, 11, 17),
         date_to=date(2026, 11, 18),
-        state="MT",
+        states=["MT"],
         modalities=[4, 6, 8],
         source_tz=BRASILIA,
         trigger=CollectionTrigger.CLI,
@@ -76,6 +76,7 @@ def test_coleta_completa_registra_a_execucao(
 
     saved = db_session.get(CollectionRun, run.id)
     assert saved is not None and saved.status == CollectionStatus.SUCCESS
+    assert saved.states == ["MT"]
 
 
 def test_segunda_coleta_do_mesmo_periodo_nao_duplica(
@@ -113,8 +114,49 @@ def test_periodo_invertido_e_rejeitado(db_session: Session, client: PncpClient) 
             client,
             date_from=date(2026, 11, 18),
             date_to=date(2026, 11, 17),
-            state="MT",
+            states=["MT"],
             modalities=[6],
             source_tz=BRASILIA,
             trigger=CollectionTrigger.CLI,
         )
+
+
+def test_sem_ufs_coleta_o_brasil_inteiro_numa_consulta(
+    db_session: Session, client: PncpClient, api: respx.MockRouter
+) -> None:
+    route = api.get(PUBLISHED_PATH).mock(return_value=httpx.Response(204))
+
+    run = run_collection(
+        db_session,
+        client,
+        date_from=date(2026, 11, 17),
+        date_to=date(2026, 11, 18),
+        states=[],
+        modalities=[6, 8],
+        source_tz=BRASILIA,
+        trigger=CollectionTrigger.CLI,
+    )
+
+    assert run.status == CollectionStatus.SUCCESS
+    assert run.states == []
+    assert route.call_count == 2  # uma por modalidade, sem repetir por UF
+    assert all("uf" not in call.request.url.params for call in route.calls)
+
+
+def test_varias_ufs_consultam_cada_uma(
+    db_session: Session, client: PncpClient, api: respx.MockRouter
+) -> None:
+    route = api.get(PUBLISHED_PATH).mock(return_value=httpx.Response(204))
+
+    _ = run_collection(
+        db_session,
+        client,
+        date_from=date(2026, 11, 17),
+        date_to=date(2026, 11, 18),
+        states=["MT", "MS"],
+        modalities=[6],
+        source_tz=BRASILIA,
+        trigger=CollectionTrigger.CLI,
+    )
+
+    assert [call.request.url.params["uf"] for call in route.calls] == ["MT", "MS"]

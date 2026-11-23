@@ -81,6 +81,7 @@ class TenderQuery:
     """Critérios já resolvidos (datas convertidas para instantes UTC)."""
 
     text: str | None = None
+    state: str | None = None
     municipality_ibge_code: str | None = None
     modality_code: int | None = None
     min_value: Decimal | None = None
@@ -100,6 +101,8 @@ def _conditions(query: TenderQuery) -> list[ColumnElement[bool]]:
         tsquery = func.websearch_to_tsquery(_SEARCH_REGCONFIG, query.text)
         # Busca só com palavras vazias ("de", "para") vira consulta vazia: não filtra.
         conditions.append(or_(func.numnode(tsquery) == 0, Tender.search_vector.op("@@")(tsquery)))
+    if query.state:
+        conditions.append(Tender.state == query.state)
     if query.municipality_ibge_code:
         conditions.append(Tender.municipality_ibge_code == query.municipality_ibge_code)
     if query.modality_code is not None:
@@ -140,11 +143,19 @@ def get_tender(session: Session, tender_id: int) -> Tender | None:
     return session.scalars(stmt).one_or_none()
 
 
-def list_municipalities(session: Session) -> list[tuple[str, str]]:
+def list_municipalities(session: Session, state: str | None = None) -> list[tuple[str, str]]:
     """(código IBGE, nome) dos municípios que têm licitações, em ordem alfabética."""
     stmt = (
         select(Tender.municipality_ibge_code, func.min(Tender.municipality_name).label("name"))
         .group_by(Tender.municipality_ibge_code)
         .order_by("name")
     )
+    if state:
+        stmt = stmt.where(Tender.state == state)
     return [(code, name) for code, name in session.execute(stmt)]
+
+
+def list_states(session: Session) -> list[str]:
+    """Siglas das UFs que têm licitações coletadas."""
+    stmt = select(Tender.state).distinct().order_by(Tender.state)
+    return list(session.scalars(stmt))

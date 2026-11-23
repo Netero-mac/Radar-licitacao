@@ -66,14 +66,19 @@ class PncpClient:
         backoff_base: float = 2.0,
         backoff_max: float = 60.0,
         page_size: int = 50,
+        min_interval: float = 0.0,
         sleep: Callable[[float], None] = time.sleep,
+        clock: Callable[[], float] = time.monotonic,
         transport: httpx.BaseTransport | None = None,
     ) -> None:
         self.max_retries = max_retries
         self.backoff_base = backoff_base
         self.backoff_max = backoff_max
         self.page_size = page_size
+        self.min_interval = min_interval
         self._sleep = sleep
+        self._clock = clock
+        self._last_request_at: float | None = None
         self._http = httpx.Client(
             base_url=base_url.rstrip("/"),
             timeout=timeout,
@@ -93,6 +98,7 @@ class PncpClient:
             backoff_base=settings.pncp_backoff_base_seconds,
             backoff_max=settings.pncp_backoff_max_seconds,
             page_size=settings.pncp_page_size,
+            min_interval=settings.pncp_request_interval_seconds,
         )
 
     def __enter__(self) -> Self:
@@ -110,15 +116,19 @@ class PncpClient:
         self._http.close()
 
     def iter_published(
-        self, date_from: date, date_to: date, modality: int, state: str
+        self, date_from: date, date_to: date, modality: int, state: str | None = None
     ) -> Iterator[PncpPage]:
-        """Contratações publicadas no período (datas inclusivas), página a página."""
+        """Contratações publicadas no período (datas inclusivas), página a página.
+
+        Sem ``state``, consulta o Brasil inteiro.
+        """
         params: dict[str, Any] = {
             "dataInicial": _format_date(date_from),
             "dataFinal": _format_date(date_to),
             "codigoModalidadeContratacao": modality,
-            "uf": state,
         }
+        if state:
+            params["uf"] = state
         return self._iter_pages(PUBLISHED_PATH, params)
 
     def _iter_pages(self, path: str, params: dict[str, Any]) -> Iterator[PncpPage]:
@@ -149,12 +159,21 @@ class PncpClient:
             items=body["data"],
         )
 
+    def _throttle(self) -> None:
+        """Garante o intervalo mínimo desde a requisição anterior."""
+        if self._last_request_at is not None and self.min_interval > 0:
+            wait = self.min_interval - (self._clock() - self._last_request_at)
+            if wait > 0:
+                self._sleep(wait)
+        self._last_request_at = self._clock()
+
     def _backoff(self, attempt: int) -> float:
         return min(self.backoff_base * 2**attempt, self.backoff_max)
 
     def _get_json(self, path: str, params: dict[str, Any]) -> Any | None:
         """GET com novas tentativas. Retorna o JSON, ou None quando a API responde 204."""
         for attempt in range(self.max_retries + 1):
+            self._throttle()
             try:
                 response = self._http.get(path, params=params)
             except _RETRYABLE_ERRORS as exc:

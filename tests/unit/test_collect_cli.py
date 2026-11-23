@@ -65,10 +65,11 @@ def test_main_executa_coleta_e_retorna_codigo(monkeypatch: pytest.MonkeyPatch) -
     assert kwargs["date_from"] == date(2026, 11, 1)
     assert kwargs["date_to"] == date(2026, 11, 22)
     assert kwargs["trigger"] == CollectionTrigger.CLI
-    assert kwargs["state"] == "MT"
+    assert kwargs["states"] == ["MT"]
 
     run.status = CollectionStatus.FAILED
-    assert collect.main([]) == 1
+    assert collect.main(["--ufs", "br"]) == 1
+    assert run_collection.call_args.kwargs["states"] == []
 
 
 def test_main_rejeita_periodo_invertido() -> None:
@@ -84,3 +85,35 @@ def test_modalidades_aceitam_lista_separada_por_virgula() -> None:
         Settings(_env_file=None, database_url="postgresql://x").pncp_modalities
         == DEFAULT_MODALITIES
     )
+
+
+def test_le_ufs() -> None:
+    parser = collect.build_parser()
+
+    assert parser.parse_args(["--ufs", "mt, ms"]).states == ["MT", "MS"]
+    assert parser.parse_args(["--ufs", "BR"]).states == []
+    assert parser.parse_args([]).states is None
+    with pytest.raises(SystemExit):
+        parser.parse_args(["--ufs", "XX"])
+
+
+@pytest.mark.parametrize(
+    ("value", "expected"),
+    [("MT", ["MT"]), ("mt, ms,MT", ["MT", "MS"]), ("", []), ("BR", [])],
+)
+def test_ufs_configuradas(value: str, expected: list[str]) -> None:
+    settings = Settings(_env_file=None, database_url="postgresql://x", pncp_states=value)  # type: ignore[arg-type]
+
+    assert settings.pncp_states == expected
+
+
+def test_uf_desconhecida_na_configuracao() -> None:
+    with pytest.raises(ValueError, match="UF desconhecida: XX"):
+        Settings(_env_file=None, database_url="postgresql://x", pncp_states="MT,XX")  # type: ignore[arg-type]
+
+
+def test_padroes_de_uf_e_fuso() -> None:
+    settings = Settings(_env_file=None, database_url="postgresql://x")  # type: ignore[call-arg]
+
+    assert settings.pncp_states == ["MT"]
+    assert settings.display_timezone == "America/Sao_Paulo"

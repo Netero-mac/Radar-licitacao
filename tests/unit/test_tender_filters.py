@@ -51,6 +51,7 @@ def test_converte_valores_do_formulario() -> None:
         {"municipality": "Rondonópolis"},
         {"page_size": "1000"},
         {"min_value": "-1"},
+        {"state": "XX"},
     ],
 )
 def test_filtros_invalidos_geram_erro_na_validacao_estrita(data: dict[str, str]) -> None:
@@ -143,3 +144,11 @@ def test_extras_do_registro_original() -> None:
         == "https://compras.mt.gov.br/x"
     )
     assert _raw_extras({}, "")["legal_basis"] is None
+
+
+def test_uf_aceita_minusculas_e_tem_mensagem_em_portugues() -> None:
+    assert TenderFilters.model_validate({"state": "mt"}).state == "MT"
+
+    filters, errors = TenderFilters.from_query_lenient({"state": "zz"})
+    assert filters.state is None
+    assert errors == ["UF: UF desconhecida"]

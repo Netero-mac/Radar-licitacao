@@ -15,6 +15,7 @@ from sqlalchemy.orm import Session
 
 from app.api.templating import display_timezone, get_templates
 from app.db import get_session
+from app.geo import municipality_in_state
 from app.schemas.tenders import TenderFilters
 from app.services import tenders as service
 
@@ -25,9 +26,14 @@ TimezoneDep = Annotated[ZoneInfo, Depends(display_timezone)]
 
 
 def _is_partial(request: Request) -> bool:
-    # Na restauração do histórico o HTMX pede a página inteira.
+    """Só os resultados quando o HTMX mira o bloco #results.
+
+    Trocar a UF recarrega o formulário inteiro (lista de municípios muda) e a restauração
+    do histórico pede a página completa.
+    """
     return (
         request.headers.get("HX-Request") == "true"
+        and request.headers.get("HX-Target") == "results"
         and request.headers.get("HX-History-Restore-Request") != "true"
     )
 
@@ -35,6 +41,13 @@ def _is_partial(request: Request) -> bool:
 @router.get("/", response_class=HTMLResponse, name="tender_list")
 def tender_list(request: Request, session: SessionDep, tz: TimezoneDep) -> HTMLResponse:
     filters, errors = TenderFilters.from_query_lenient(dict(request.query_params))
+    if (
+        filters.state
+        and filters.municipality
+        and not municipality_in_state(filters.municipality, filters.state)
+    ):
+        # Município de outra UF (sobra de quando a UF foi trocada): descarta.
+        filters = filters.model_copy(update={"municipality": None})
     result = service.search(session, filters, tz)
 
     def page_url(page: int) -> str:
@@ -50,10 +63,17 @@ def tender_list(request: Request, session: SessionDep, tz: TimezoneDep) -> HTMLR
     if _is_partial(request):
         response = get_templates().TemplateResponse(request, "tenders/_results.html", context)
     else:
-        context["municipalities"] = service.municipalities(session)
+        states = service.states(session)
+        context["states"] = states
+        # Com várias UFs, a lista de municípios só aparece depois de escolher a UF.
+        context["municipalities"] = (
+            service.municipalities(session, filters.state)
+            if filters.state or len(states) <= 1
+            else []
+        )
         response = get_templates().TemplateResponse(request, "tenders/list.html", context)
     # Mesma URL, conteúdos diferentes (página inteira x parcial): não misturar em cache.
-    response.headers["Vary"] = "HX-Request"
+    response.headers["Vary"] = "HX-Request, HX-Target"
     return response
 
 

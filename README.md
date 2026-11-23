@@ -1,7 +1,7 @@
 # Radar de Licitações MT
 
-Coleta as contratações publicadas no [PNCP](https://pncp.gov.br), filtra as de Mato Grosso e
-avisa pequenas empresas quando surge uma licitação que combina com as palavras-chave delas.
+Coleta as contratações publicadas no [PNCP](https://pncp.gov.br), das UFs configuradas (padrão:
+Mato Grosso; pode ser o Brasil inteiro), e avisa pequenas empresas quando surge uma licitação que combina com as palavras-chave delas.
 
 > Projeto em construção, por fases. A documentação completa (arquitetura, diagramas,
 > decisões técnicas) entra na Fase 6.
@@ -38,11 +38,12 @@ uv run uvicorn app.main:app --reload
 | `/licitacoes/{id}` | Detalhe da licitação, com link para o edital no PNCP |
 | `/api/tenders` | Mesma listagem em JSON, com os mesmos filtros |
 | `/api/tenders/{id}` | Detalhe em JSON |
-| `/api/municipalities`, `/api/modalities` | Valores aceitos nos filtros |
+| `/api/states`, `/api/municipalities?state=MT`, `/api/modalities` | Valores aceitos nos filtros |
 | `/docs` | Documentação interativa da API |
 
-**Filtros:** busca no objeto (`q`), município (código IBGE), modalidade, faixa de valor estimado,
-período de publicação e "só com propostas ainda abertas" (inclui as que ainda vão abrir).
+**Filtros:** busca no objeto (`q`), UF (`state`), município (código IBGE), modalidade, faixa de
+valor estimado, período de publicação e "só com propostas ainda abertas" (inclui as que ainda vão
+abrir). Com mais de uma UF coletada, a tela pede a UF antes de listar os municípios.
 
 **Busca textual:** usa o full-text search do PostgreSQL com dicionário `portuguese` + `unaccent`.
 Por isso `manutencao` encontra "MANUTENÇÃO" e `computador` encontra "computadores". Aceita
@@ -52,21 +53,31 @@ Por isso `manutencao` encontra "MANUTENÇÃO" e `computador` encontra "computado
 curl "http://localhost:8000/api/tenders?q=manutencao&municipality=5107602&open_only=true"
 ```
 
-Datas dos filtros são dias no fuso de Cuiabá; na API, datas saem em UTC (ISO 8601) e valores
+Datas dos filtros são dias no fuso de exibição (padrão: Brasília); na API, datas saem em UTC (ISO 8601) e valores
 como texto decimal (`"3500000.0000"`) para não perder precisão. As telas funcionam sem
 JavaScript; com ele, o HTMX atualiza só a lista ao mudar um filtro.
 
 ## Coleta do PNCP
 
 A coleta usa a [API pública de consulta do PNCP](https://pncp.gov.br/api/consulta/swagger-ui/index.html)
-(endpoint `/v1/contratacoes/publicacao`), filtrando pela UF de `PNCP_STATE`. Como a API exige
-uma modalidade por consulta, cada execução percorre as modalidades de `PNCP_MODALITIES`, página
-a página.
+(endpoint `/v1/contratacoes/publicacao`). Como a API exige uma modalidade por consulta, cada
+execução percorre as modalidades de `PNCP_MODALITIES`, página a página.
+
+**Abrangência (`PNCP_STATES`):** uma lista de UFs (`MT`, `MT,MS,GO`...) ou vazio/`BR` para o
+Brasil inteiro, que é coletado numa consulta só por modalidade, sem filtro de UF. O padrão é `MT`.
+
+| | Só MT | Brasil inteiro |
+|---|---|---|
+| Licitações por dia (aprox.) | 50 a 70 | 7 mil |
+| Requisições por coleta (2 dias, todas as modalidades) | ~15 | ~300 |
+| Tempo por coleta | segundos | 10 a 30 min (limite de requisições do PNCP) |
+| Crescimento do banco | dezenas de MB/ano | 8 a 10 GB/ano |
 
 ```bash
 uv run python -m app.collect                                    # últimos 2 dias (padrão)
 uv run python -m app.collect --from 2026-11-01 --to 2026-11-22  # período específico
 uv run python -m app.collect --modalidades 6,8                  # só pregão eletrônico e dispensa
+uv run python -m app.collect --ufs MT,MS                        # outras UFs (ou --ufs BR)
 docker compose exec app python -m app.collect                   # dentro do Docker
 ```
 
@@ -78,7 +89,12 @@ docker compose exec app python -m app.collect                   # dentro do Dock
 - **Rastreável:** toda execução fica em `collection_runs`, com páginas lidas, novas, atualizadas
   e a mensagem de erro, se houver. Cada página é salva assim que chega, então uma falha no meio
   não perde o que já foi coletado. O comando sai com código `1` se a coleta falhar.
+- **Educado com a API:** intervalo mínimo entre requisições (`PNCP_REQUEST_INTERVAL_SECONDS`,
+  padrão 1 s), o que reduz as respostas 429 nas coletas grandes.
 - **Datas:** a API informa horários de Brasília sem fuso (`PNCP_TIMEZONE`); no banco tudo é UTC.
+  Nas telas, as datas saem no fuso de `DISPLAY_TIMEZONE`, que por padrão é o horário de Brasília,
+  o mesmo dos editais. Em MT o relógio local está 1 hora atrás: 09:00 de Brasília são 08:00 em
+  Cuiabá.
 
 Códigos de modalidade: 1 Leilão eletrônico, 2 Diálogo competitivo, 3 Concurso,
 4 Concorrência eletrônica, 5 Concorrência presencial, 6 Pregão eletrônico, 7 Pregão presencial,

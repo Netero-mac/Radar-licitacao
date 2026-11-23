@@ -113,7 +113,9 @@ def test_pagina_inicial_lista_licitacoes(client: TestClient, seeded: dict[str, i
     assert "<html" in html
     assert "2 licitações encontradas" in html
     assert "R$ 5.260.541,60" in html
-    assert "Propostas até 01/12/2099 09:00" in html  # 13:00 UTC = 09:00 em Cuiabá
+    # 13:00 UTC = 10:00 em Brasília (fuso padrão de exibição)
+    assert "Propostas até 01/12/2099 10:00 (horário de Brasília)" in html
+    assert "Rondonópolis/MT" in html
     assert f'href="/licitacoes/{seeded["ti"]}"' in html
     assert '<option value="5107602">Rondonópolis</option>' in html
     # Texto vindo do PNCP é escapado
@@ -123,16 +125,28 @@ def test_pagina_inicial_lista_licitacoes(client: TestClient, seeded: dict[str, i
 def test_requisicao_htmx_recebe_so_os_resultados(
     client: TestClient, seeded: dict[str, int]
 ) -> None:
-    response = client.get("/", params={"q": "alimenticios"}, headers={"HX-Request": "true"})
+    response = client.get(
+        "/", params={"q": "alimenticios"}, headers={"HX-Request": "true", "HX-Target": "results"}
+    )
 
     assert response.status_code == 200
     assert "<html" not in response.text
     assert "1 licitação encontrada" in response.text
     assert "Aquisição de gêneros alimentícios" in response.text
-    assert response.headers["vary"] == "HX-Request"
+    assert response.headers["vary"] == "HX-Request, HX-Target"
 
-    restore = client.get("/", headers={"HX-Request": "true", "HX-History-Restore-Request": "true"})
+    restore = client.get(
+        "/",
+        headers={
+            "HX-Request": "true",
+            "HX-Target": "results",
+            "HX-History-Restore-Request": "true",
+        },
+    )
     assert "<html" in restore.text
+    # Troca de UF mira #content: precisa da página inteira (o HTMX recorta com hx-select)
+    whole = client.get("/", headers={"HX-Request": "true", "HX-Target": "content"})
+    assert 'id="content"' in whole.text
 
 
 def test_tela_ignora_filtro_invalido_com_aviso(client: TestClient, seeded: dict[str, int]) -> None:
@@ -181,3 +195,58 @@ def test_detalhe_inexistente_retorna_404(client: TestClient, seeded: dict[str, i
 def test_arquivos_estaticos(client: TestClient) -> None:
     assert client.get("/static/css/style.css").status_code == 200
     assert client.get("/static/vendor/htmx.min.js").status_code == 200
+
+
+def test_com_uma_uf_nao_mostra_seletor_de_uf(client: TestClient, seeded: dict[str, int]) -> None:
+    html = client.get("/").text
+
+    assert "Licitações em Mato Grosso" in html
+    assert 'name="state"' not in html
+    assert '<option value="5107602">Rondonópolis</option>' in html
+
+
+def test_com_varias_ufs_municipios_aparecem_depois_da_uf(
+    client: TestClient, db_session: Session, seeded: dict[str, int]
+) -> None:
+    sp = make_tender(db_session, municipality=("3550308", "São Paulo"), state="SP")
+    db_session.commit()
+
+    html = client.get("/").text
+    assert "Licitações públicas" in html
+    assert '<option value="SP">SP · São Paulo</option>' in html
+    assert "Escolha a UF primeiro" in html
+
+    html = client.get("/", params={"state": "SP"}).text
+    assert '<option value="SP" selected>' in html
+    assert '<option value="3550308">São Paulo</option>' in html
+    assert "Rondonópolis" not in html
+    assert "1 licitação encontrada" in html
+    assert f"/licitacoes/{sp.id}" in html
+
+
+def test_municipio_de_outra_uf_e_descartado_na_tela(
+    client: TestClient, db_session: Session, seeded: dict[str, int]
+) -> None:
+    make_tender(db_session, municipality=("3550308", "São Paulo"), state="SP")
+    db_session.commit()
+
+    # Rondonópolis (MT) ficou na URL depois de trocar a UF para SP
+    html = client.get("/", params={"state": "SP", "municipality": RONDONOPOLIS[0]}).text
+
+    assert "1 licitação encontrada" in html
+
+
+def test_api_filtra_por_uf(client: TestClient, db_session: Session, seeded: dict[str, int]) -> None:
+    make_tender(db_session, municipality=("3550308", "São Paulo"), state="SP")
+    db_session.commit()
+
+    assert client.get("/api/tenders", params={"state": "sp"}).json()["total"] == 1
+    assert client.get("/api/tenders", params={"state": "MT"}).json()["total"] == 2
+    assert client.get("/api/tenders", params={"state": "XX"}).status_code == 422
+    assert client.get("/api/states").json() == [
+        {"code": "MT", "name": "Mato Grosso"},
+        {"code": "SP", "name": "São Paulo"},
+    ]
+    assert client.get("/api/municipalities", params={"state": "sp"}).json() == [
+        {"ibge_code": "3550308", "name": "São Paulo"}
+    ]

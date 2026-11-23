@@ -1,6 +1,7 @@
 from datetime import date, datetime
 
-from sqlalchemy import Date, DateTime, Enum, Text, func, text
+from sqlalchemy import Date, DateTime, Enum, String, Text, func, text
+from sqlalchemy.dialects.postgresql import ARRAY
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.models.base import Base
@@ -26,6 +27,8 @@ class CollectionRun(Base):
     )
     date_from: Mapped[date] = mapped_column(Date)
     date_to: Mapped[date] = mapped_column(Date)
+    # UFs consultadas; vazio = Brasil inteiro.
+    states: Mapped[list[str]] = mapped_column(ARRAY(String(2)), server_default=text("'{}'"))
     pages_fetched: Mapped[int] = mapped_column(server_default=text("0"))
     tenders_new: Mapped[int] = mapped_column(server_default=text("0"))
     tenders_updated: Mapped[int] = mapped_column(server_default=text("0"))

@@ -136,3 +136,13 @@ def test_detalhe_e_lista_de_municipios(db_session: Session) -> None:
     assert detail.process_number == "12/2026"
     assert service.get_detail(db_session, 999_999) is None
     assert service.municipalities(db_session) == [PEDRA_PRETA, RONDONOPOLIS]
+
+
+def test_filtra_por_uf(db_session: Session) -> None:
+    mt = make_tender(db_session)
+    sp = make_tender(db_session, municipality=("3550308", "São Paulo"), state="SP")
+
+    assert _ids(db_session, state="sp") == [sp.id]
+    assert _ids(db_session, state="MT") == [mt.id]
+    assert service.states(db_session) == ["MT", "SP"]
+    assert service.municipalities(db_session, "SP") == [("3550308", "São Paulo")]

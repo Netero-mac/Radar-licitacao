@@ -201,3 +201,33 @@ def test_json_invalido_gera_erro(client: PncpClient, api: respx.MockRouter) -> N
 
     with pytest.raises(PncpError, match="JSON inválido"):
         _collect(client)
+
+
+def test_sem_uf_consulta_o_brasil_inteiro(client: PncpClient, api: respx.MockRouter) -> None:
+    route = api.get(PUBLISHED_PATH).mock(return_value=httpx.Response(204))
+
+    list(client.iter_published(date(2026, 11, 17), date(2026, 11, 18), 6))
+
+    assert "uf" not in route.calls.last.request.url.params
+
+
+def test_respeita_intervalo_minimo_entre_requisicoes(api: respx.MockRouter) -> None:
+    now = [100.0]
+    sleeps: list[float] = []
+
+    def fake_sleep(seconds: float) -> None:
+        sleeps.append(seconds)
+        now[0] += seconds
+
+    api.get(PUBLISHED_PATH, params={"pagina": "1"}).mock(
+        return_value=httpx.Response(200, json=PAGE_1)
+    )
+    api.get(PUBLISHED_PATH, params={"pagina": "2"}).mock(
+        return_value=httpx.Response(200, json=PAGE_2)
+    )
+    client = PncpClient(BASE_URL, min_interval=1.5, sleep=fake_sleep, clock=lambda: now[0])
+
+    pages = list(client.iter_published(date(2026, 11, 17), date(2026, 11, 18), 6, "MT"))
+
+    assert len(pages) == 2
+    assert sleeps == [1.5]  # a primeira requisição não espera; a segunda espera o intervalo

@@ -18,10 +18,11 @@ def _start_of_day(day: date, tz: ZoneInfo) -> datetime:
 
 
 def build_query(filters: TenderFilters, tz: ZoneInfo, now: datetime) -> TenderQuery:
-    """As datas do filtro são dias no fuso de exibição (America/Cuiaba): "publicadas em
-    22/11" significa de 22/11 00:00 até 23/11 00:00 no horário de Cuiabá."""
+    """As datas do filtro são dias no fuso de exibição (padrão: Brasília): "publicadas em
+    22/11" significa de 22/11 00:00 até 23/11 00:00 nesse fuso."""
     return TenderQuery(
         text=filters.q,
+        state=filters.state,
         municipality_ibge_code=filters.municipality,
         modality_code=filters.modality,
         min_value=filters.min_value,
@@ -131,5 +132,9 @@ def get_detail(
     return to_detail(tender, now or datetime.now(UTC)) if tender else None
 
 
-def municipalities(session: Session) -> list[tuple[str, str]]:
-    return repository.list_municipalities(session)
+def municipalities(session: Session, state: str | None = None) -> list[tuple[str, str]]:
+    return repository.list_municipalities(session, state)
+
+
+def states(session: Session) -> list[str]:
+    return repository.list_states(session)

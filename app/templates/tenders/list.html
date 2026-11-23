@@ -1,11 +1,16 @@
 {% extends "base.html" %}
 
 {% block content %}
-<h1 class="page-title">Licitações em Mato Grosso</h1>
+<div id="content">
+<h1 class="page-title">
+  {% if states | length == 1 %}Licitações em {{ state_name(states[0]) }}{% else %}Licitações públicas{% endif %}
+</h1>
 
+{#- Trocar a UF recarrega o formulário (#content) para atualizar a lista de municípios;
+    os demais filtros trocam só os resultados (#results). -#}
 <form id="filters" class="filters" method="get" action="{{ path_for('tender_list') }}"
       hx-get="{{ path_for('tender_list') }}" hx-target="#results" hx-push-url="true"
-      hx-trigger="submit, change, input changed delay:500ms from:#q"
+      hx-trigger="submit, change[target.name !== 'state'], input changed delay:500ms from:#q"
       hx-indicator="#results" role="search">
   <div class="field field-search">
     <label for="q">Buscar no objeto</label>
@@ -13,13 +18,32 @@
            placeholder='Ex.: manutenção de computadores, "ar condicionado"' autocomplete="off">
   </div>
 
+  {% if states | length > 1 %}
+  <div class="field">
+    <label for="state">UF</label>
+    <select id="state" name="state"
+            hx-get="{{ path_for('tender_list') }}" hx-include="closest form"
+            hx-params="not municipality" hx-target="#content" hx-select="#content"
+            hx-swap="outerHTML" hx-push-url="true">
+      <option value="">Todas</option>
+      {% for code in states %}
+      <option value="{{ code }}"{% if filters.state == code %} selected{% endif %}>{{ code }} · {{ state_name(code) }}</option>
+      {% endfor %}
+    </select>
+  </div>
+  {% endif %}
+
   <div class="field">
     <label for="municipality">Município</label>
-    <select id="municipality" name="municipality">
+    <select id="municipality" name="municipality"{% if not municipalities %} disabled{% endif %}>
+      {% if municipalities %}
       <option value="">Todos</option>
       {% for code, name in municipalities %}
       <option value="{{ code }}"{% if filters.municipality == code %} selected{% endif %}>{{ name }}</option>
       {% endfor %}
+      {% else %}
+      <option value="">Escolha a UF primeiro</option>
+      {% endif %}
     </select>
   </div>
 
@@ -67,4 +91,5 @@
 <section id="results" aria-live="polite">
   {% include "tenders/_results.html" %}
 </section>
+</div>
 {% endblock %}

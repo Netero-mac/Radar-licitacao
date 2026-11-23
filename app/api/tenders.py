@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 from app.api.templating import display_timezone
 from app.collectors.pncp.modalities import MODALITIES
 from app.db import get_session
+from app.geo import state_name
 from app.schemas.tenders import TenderDetail, TenderFilters, TenderPage
 from app.services import tenders as service
 
@@ -21,6 +22,11 @@ TimezoneDep = Annotated[ZoneInfo, Depends(display_timezone)]
 
 class Municipality(BaseModel):
     ibge_code: str
+    name: str
+
+
+class State(BaseModel):
+    code: str
     name: str
 
 
@@ -36,7 +42,8 @@ class Modality(BaseModel):
     description=(
         "Licitações mais recentes primeiro. A busca `q` usa o full-text search do PostgreSQL "
         "em português e ignora acentos (`manutencao` encontra `manutenção`). Os filtros de "
-        "data são dias no fuso America/Cuiaba. Valores monetários vêm como texto decimal "
+        "data são dias no fuso de exibição (DISPLAY_TIMEZONE, padrão: horário de Brasília). "
+        "Valores monetários vêm como texto decimal "
         '(ex.: `"5260541.6000"`) para não perder precisão; datas em UTC (ISO 8601).'
     ),
 )
@@ -64,10 +71,25 @@ def get_tender(tender_id: int, session: SessionDep) -> TenderDetail:
     response_model=list[Municipality],
     summary="Municípios com licitações coletadas (valores aceitos em `municipality`)",
 )
-def list_municipalities(session: SessionDep) -> list[Municipality]:
+def list_municipalities(
+    session: SessionDep,
+    state: Annotated[
+        str | None, Query(pattern=r"^[A-Za-z]{2}$", description="Somente desta UF")
+    ] = None,
+) -> list[Municipality]:
     return [
-        Municipality(ibge_code=code, name=name) for code, name in service.municipalities(session)
+        Municipality(ibge_code=code, name=name)
+        for code, name in service.municipalities(session, state.upper() if state else None)
     ]
+
+
+@router.get(
+    "/states",
+    response_model=list[State],
+    summary="UFs com licitações coletadas (valores aceitos em `state`)",
+)
+def list_states(session: SessionDep) -> list[State]:
+    return [State(code=code, name=state_name(code)) for code in service.states(session)]
 
 
 @router.get(

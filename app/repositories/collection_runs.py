@@ -1,5 +1,6 @@
 """Registro das execuções da coleta (tabela collection_runs)."""
 
+from collections.abc import Sequence
 from datetime import UTC, date, datetime
 
 from sqlalchemy.orm import Session
@@ -8,10 +9,16 @@ from app.models import CollectionRun, CollectionStatus, CollectionTrigger
 
 
 def start_run(
-    session: Session, *, trigger: CollectionTrigger, date_from: date, date_to: date
+    session: Session,
+    *,
+    trigger: CollectionTrigger,
+    date_from: date,
+    date_to: date,
+    states: Sequence[str] = (),
 ) -> CollectionRun:
     run = CollectionRun(
         trigger=trigger,
+        states=list(states),
         date_from=date_from,
         date_to=date_to,
         status=CollectionStatus.RUNNING,

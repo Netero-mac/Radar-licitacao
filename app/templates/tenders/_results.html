@@ -18,7 +18,7 @@
   <li class="tender-card">
     <div class="tender-meta">
       <span class="tag">{{ tender.modality_name }}</span>
-      <span>{{ tender.municipality_name }}</span>
+      <span>{{ tender.municipality_name }}/{{ tender.state }}</span>
       <span>Publicada em {{ tender.published_at | date_br }}</span>
     </div>
     <h2 class="tender-title">
@@ -28,7 +28,7 @@
     <div class="tender-footer">
       <span class="value">{{ tender.estimated_value | brl }}</span>
       {% if tender.proposals_open %}
-        <span class="status status-open">Propostas até {{ tender.proposals_close_at | datetime_br }}</span>
+        <span class="status status-open">Propostas até {{ tender.proposals_close_at | datetime_br }} ({{ tz_label }})</span>
       {% elif tender.proposals_close_at %}
         <span class="status status-closed">Propostas encerradas em {{ tender.proposals_close_at | date_br }}</span>
       {% endif %}
