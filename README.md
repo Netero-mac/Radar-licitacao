@@ -531,3 +531,7 @@ tests/            unit/ e integration/
   UptimeRobot ou Healthchecks.io, apontado para `/health`.
 - **Categorias imperfeitas:** são uma aproximação por palavras-chave. Uma licitação pode cair em
   mais de uma ou em nenhuma.
+
+## Licença
+
+Distribuído sob a licença MIT. Veja [LICENSE](LICENSE).

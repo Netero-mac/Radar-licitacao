@@ -4,6 +4,7 @@ version = "0.1.0"
 description = "Radar de licitações do PNCP para Mato Grosso"
 readme = "README.md"
 requires-python = ">=3.12"
+license = "MIT"
 dependencies = [
     "alembic>=1.20.1",
     "apscheduler>=3.11,<4",
